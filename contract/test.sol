@@ -1,189 +1,49 @@
 /**
- *Submitted for verification at FtmScan.com on 2021-10-25
+ *Submitted for verification at snowtrace.io on 2021-11-29
 */
 
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
 pragma solidity 0.7.5;
 
-library FullMath {
-    function fullMul(uint256 x, uint256 y) private pure returns (uint256 l, uint256 h) {
-        uint256 mm = mulmod(x, y, uint256(-1));
-        l = x * y;
-        h = mm - l;
-        if (mm < l) h -= 1;
+library SafeERC20 {
+    using SafeMath for uint256;
+    using Address for address;
+
+    function safeTransfer(IERC20 token, address to, uint256 value) internal {
+        _callOptionalReturn(token, abi.encodeWithSelector(token.transfer.selector, to, value));
     }
 
-    function fullDiv(
-        uint256 l,
-        uint256 h,
-        uint256 d
-    ) private pure returns (uint256) {
-        uint256 pow2 = d & -d;
-        d /= pow2;
-        l /= pow2;
-        l += h * ((-pow2) / pow2 + 1);
-        uint256 r = 1;
-        r *= 2 - d * r;
-        r *= 2 - d * r;
-        r *= 2 - d * r;
-        r *= 2 - d * r;
-        r *= 2 - d * r;
-        r *= 2 - d * r;
-        r *= 2 - d * r;
-        r *= 2 - d * r;
-        return l * r;
+    function safeTransferFrom(IERC20 token, address from, address to, uint256 value) internal {
+        _callOptionalReturn(token, abi.encodeWithSelector(token.transferFrom.selector, from, to, value));
     }
 
-    function mulDiv(
-        uint256 x,
-        uint256 y,
-        uint256 d
-    ) internal pure returns (uint256) {
-        (uint256 l, uint256 h) = fullMul(x, y);
-        uint256 mm = mulmod(x, y, d);
-        if (mm > l) h -= 1;
-        l -= mm;
-        require(h < d, 'FullMath::mulDiv: overflow');
-        return fullDiv(l, h, d);
-    }
-}
+    function safeApprove(IERC20 token, address spender, uint256 value) internal {
 
-library Babylonian {
-
-    function sqrt(uint256 x) internal pure returns (uint256) {
-        if (x == 0) return 0;
-
-        uint256 xx = x;
-        uint256 r = 1;
-        if (xx >= 0x100000000000000000000000000000000) {
-            xx >>= 128;
-            r <<= 64;
-        }
-        if (xx >= 0x10000000000000000) {
-            xx >>= 64;
-            r <<= 32;
-        }
-        if (xx >= 0x100000000) {
-            xx >>= 32;
-            r <<= 16;
-        }
-        if (xx >= 0x10000) {
-            xx >>= 16;
-            r <<= 8;
-        }
-        if (xx >= 0x100) {
-            xx >>= 8;
-            r <<= 4;
-        }
-        if (xx >= 0x10) {
-            xx >>= 4;
-            r <<= 2;
-        }
-        if (xx >= 0x8) {
-            r <<= 1;
-        }
-        r = (r + x / r) >> 1;
-        r = (r + x / r) >> 1;
-        r = (r + x / r) >> 1;
-        r = (r + x / r) >> 1;
-        r = (r + x / r) >> 1;
-        r = (r + x / r) >> 1;
-        r = (r + x / r) >> 1; // Seven iterations should be enough
-        uint256 r1 = x / r;
-        return (r < r1 ? r : r1);
-    }
-}
-
-library BitMath {
-
-    function mostSignificantBit(uint256 x) internal pure returns (uint8 r) {
-        require(x > 0, 'BitMath::mostSignificantBit: zero');
-
-        if (x >= 0x100000000000000000000000000000000) {
-            x >>= 128;
-            r += 128;
-        }
-        if (x >= 0x10000000000000000) {
-            x >>= 64;
-            r += 64;
-        }
-        if (x >= 0x100000000) {
-            x >>= 32;
-            r += 32;
-        }
-        if (x >= 0x10000) {
-            x >>= 16;
-            r += 16;
-        }
-        if (x >= 0x100) {
-            x >>= 8;
-            r += 8;
-        }
-        if (x >= 0x10) {
-            x >>= 4;
-            r += 4;
-        }
-        if (x >= 0x4) {
-            x >>= 2;
-            r += 2;
-        }
-        if (x >= 0x2) r += 1;
-    }
-}
-
-library FixedPoint {
-    // range: [0, 2**112 - 1]
-    // resolution: 1 / 2**112
-    struct uq112x112 {
-        uint224 _x;
+        require((value == 0) || (token.allowance(address(this), spender) == 0),
+            "SafeERC20: approve from non-zero to non-zero allowance"
+        );
+        _callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, value));
     }
 
-    // range: [0, 2**144 - 1]
-    // resolution: 1 / 2**112
-    struct uq144x112 {
-        uint256 _x;
+    function safeIncreaseAllowance(IERC20 token, address spender, uint256 value) internal {
+        uint256 newAllowance = token.allowance(address(this), spender).add(value);
+        _callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, newAllowance));
     }
 
-    uint8 private constant RESOLUTION = 112;
-    uint256 private constant Q112 = 0x10000000000000000000000000000;
-    uint256 private constant Q224 = 0x100000000000000000000000000000000000000000000000000000000;
-    uint256 private constant LOWER_MASK = 0xffffffffffffffffffffffffffff; // decimal of UQ*x112 (lower 112 bits)
-
-    // decode a UQ112x112 into a uint112 by truncating after the radix point
-    function decode(uq112x112 memory self) internal pure returns (uint112) {
-        return uint112(self._x >> RESOLUTION);
+    function safeDecreaseAllowance(IERC20 token, address spender, uint256 value) internal {
+        uint256 newAllowance = token.allowance(address(this), spender)
+            .sub(value, "SafeERC20: decreased allowance below zero");
+        _callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, newAllowance));
     }
 
-    // decode a uq112x112 into a uint with 18 decimals of precision
-    function decode112with18(uq112x112 memory self) internal pure returns (uint) {
-        return uint(self._x) / 5192296858534827;
-    }
+    function _callOptionalReturn(IERC20 token, bytes memory data) private {
 
-    function fraction(uint256 numerator, uint256 denominator) internal pure returns (uq112x112 memory) {
-        require(denominator > 0, 'FixedPoint::fraction: division by zero');
-        if (numerator == 0) return FixedPoint.uq112x112(0);
-
-        if (numerator <= uint144(-1)) {
-            uint256 result = (numerator << RESOLUTION) / denominator;
-            require(result <= uint224(-1), 'FixedPoint::fraction: overflow');
-            return uq112x112(uint224(result));
-        } else {
-            uint256 result = FullMath.mulDiv(numerator, Q112, denominator);
-            require(result <= uint224(-1), 'FixedPoint::fraction: overflow');
-            return uq112x112(uint224(result));
+        bytes memory returndata = address(token).functionCall(data, "SafeERC20: low-level call failed");
+        if (returndata.length > 0) { // Return data is optional
+            // solhint-disable-next-line max-line-length
+            require(abi.decode(returndata, (bool)), "SafeERC20: ERC20 operation did not succeed");
         }
-    }
-
-    // square root of a UQ112x112
-    // lossy between 0/1 and 40 bits
-    function sqrt(uq112x112 memory self) internal pure returns (uq112x112 memory) {
-        if (self._x <= uint144(-1)) {
-            return uq112x112(uint224(Babylonian.sqrt(uint256(self._x) << 112)));
-        }
-
-        uint8 safeShiftBits = 255 - BitMath.mostSignificantBit(self._x);
-        safeShiftBits -= safeShiftBits % 2;
-        return uq112x112(uint224(Babylonian.sqrt(uint256(self._x) << safeShiftBits) << ((112 - safeShiftBits) / 2)));
     }
 }
 
@@ -191,6 +51,13 @@ library SafeMath {
 
     function add(uint256 a, uint256 b) internal pure returns (uint256) {
         uint256 c = a + b;
+        require(c >= a, "SafeMath: addition overflow");
+
+        return c;
+    }
+
+    function add32(uint32 a, uint32 b) internal pure returns (uint32) {
+        uint32 c = a + b;
         require(c >= a, "SafeMath: addition overflow");
 
         return c;
@@ -231,6 +98,16 @@ library SafeMath {
         return c;
     }
 
+    function mod(uint256 a, uint256 b) internal pure returns (uint256) {
+        return mod(a, b, "SafeMath: modulo by zero");
+    }
+
+    function mod(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
+        require(b != 0, errorMessage);
+        return a % b;
+    }
+
+    // babylonian method (https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Babylonian_method)
     function sqrrt(uint256 a) internal pure returns (uint c) {
         if (a > 3) {
             c = a;
@@ -243,80 +120,416 @@ library SafeMath {
             c = 1;
         }
     }
+
+    function percentageAmount( uint256 total_, uint8 percentage_ ) internal pure returns ( uint256 percentAmount_ ) {
+        return div( mul( total_, percentage_ ), 1000 );
+    }
+
+    function substractPercentage( uint256 total_, uint8 percentageToSub_ ) internal pure returns ( uint256 result_ ) {
+        return sub( total_, div( mul( total_, percentageToSub_ ), 1000 ) );
+    }
+
+    function percentageOfTotal( uint256 part_, uint256 total_ ) internal pure returns ( uint256 percent_ ) {
+        return div( mul(part_, 100) , total_ );
+    }
+
+    function average(uint256 a, uint256 b) internal pure returns (uint256) {
+        // (a + b) / 2 can overflow, so we distribute
+        return (a / 2) + (b / 2) + ((a % 2 + b % 2) / 2);
+    }
+
+    function quadraticPricing( uint256 payment_, uint256 multiplier_ ) internal pure returns (uint256) {
+        return sqrrt( mul( multiplier_, payment_ ) );
+    }
+
+  function bondingCurve( uint256 supply_, uint256 multiplier_ ) internal pure returns (uint256) {
+      return mul( multiplier_, supply_ );
+  }
 }
 
 interface IERC20 {
-    function decimals() external view returns (uint8);
+
+    function totalSupply() external view returns (uint256);
+
+    function balanceOf(address account) external view returns (uint256);
+
+    function transfer(address recipient, uint256 amount) external returns (bool);
+
+    function allowance(address owner, address spender) external view returns (uint256);
+
+    function approve(address spender, uint256 amount) external returns (bool);
+
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
-interface IUniswapV2ERC20 {
-    function totalSupply() external view returns (uint);
+library Address {
+
+    function isContract(address account) internal view returns (bool) {
+        // This method relies in extcodesize, which returns 0 for contracts in
+        // construction, since the code is only stored at the end of the
+        // constructor execution.
+
+        uint256 size;
+        // solhint-disable-next-line no-inline-assembly
+        assembly { size := extcodesize(account) }
+        return size > 0;
+    }
+
+    function sendValue(address payable recipient, uint256 amount) internal {
+        require(address(this).balance >= amount, "Address: insufficient balance");
+
+        // solhint-disable-next-line avoid-low-level-calls, avoid-call-value
+        (bool success, ) = recipient.call{ value: amount }("");
+        require(success, "Address: unable to send value, recipient may have reverted");
+    }
+
+    function functionCall(address target, bytes memory data) internal returns (bytes memory) {
+      return functionCall(target, data, "Address: low-level call failed");
+    }
+
+    function functionCall(
+        address target, 
+        bytes memory data, 
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        return _functionCallWithValue(target, data, 0, errorMessage);
+    }
+
+    function functionCallWithValue(address target, bytes memory data, uint256 value) internal returns (bytes memory) {
+        return functionCallWithValue(target, data, value, "Address: low-level call with value failed");
+    }
+
+    function functionCallWithValue(
+        address target, 
+        bytes memory data, 
+        uint256 value, 
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+    function _functionCallWithValue(
+        address target, 
+        bytes memory data, 
+        uint256 weiValue, 
+        string memory errorMessage
+    ) private returns (bytes memory) {
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: weiValue }(data);
+        if (success) {
+            return returndata;
+        } else {
+            // Look for revert reason and bubble it up if present
+            if (returndata.length > 0) {
+                // The easiest way to bubble the revert reason is using memory via assembly
+
+                // solhint-disable-next-line no-inline-assembly
+                assembly {
+                    let returndata_size := mload(returndata)
+                    revert(add(32, returndata), returndata_size)
+                }
+            } else {
+                revert(errorMessage);
+            }
+        }
+    }
+
+    function functionStaticCall(address target, bytes memory data) internal view returns (bytes memory) {
+        return functionStaticCall(target, data, "Address: low-level static call failed");
+    }
+
+    function functionStaticCall(
+        address target, 
+        bytes memory data, 
+        string memory errorMessage
+    ) internal view returns (bytes memory) {
+        require(isContract(target), "Address: static call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.staticcall(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+    function functionDelegateCall(address target, bytes memory data) internal returns (bytes memory) {
+        return functionDelegateCall(target, data, "Address: low-level delegate call failed");
+    }
+
+    function functionDelegateCall(
+        address target, 
+        bytes memory data, 
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        require(isContract(target), "Address: delegate call to non-contract");
+        (bool success, bytes memory returndata) = target.delegatecall(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+    function _verifyCallResult(
+        bool success, 
+        bytes memory returndata, 
+        string memory errorMessage
+    ) private pure returns(bytes memory) {
+        if (success) {
+            return returndata;
+        } else {
+            if (returndata.length > 0) {
+                assembly {
+                    let returndata_size := mload(returndata)
+                    revert(add(32, returndata), returndata_size)
+                }
+            } else {
+                revert(errorMessage);
+            }
+        }
+    }
+
+    function addressToString(address _address) internal pure returns(string memory) {
+        bytes32 _bytes = bytes32(uint256(_address));
+        bytes memory HEX = "0123456789abcdef";
+        bytes memory _addr = new bytes(42);
+
+        _addr[0] = '0';
+        _addr[1] = 'x';
+
+        for(uint256 i = 0; i < 20; i++) {
+            _addr[2+i*2] = HEX[uint8(_bytes[i + 12] >> 4)];
+            _addr[3+i*2] = HEX[uint8(_bytes[i + 12] & 0x0f)];
+        }
+
+        return string(_addr);
+
+    }
 }
 
-interface IUniswapV2Pair is IUniswapV2ERC20 {
-    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
-    function token0() external view returns ( address );
-    function token1() external view returns ( address );
+
+interface IPolicy {
+
+    function policy() external view returns (address);
+
+    function renouncePolicy() external;
+  
+    function pushPolicy( address newPolicy_ ) external;
+
+    function pullPolicy() external;
 }
 
-interface IBondingCalculator {
-  function valuation( address pair_, uint amount_ ) external view returns ( uint _value );
+contract Policy is IPolicy {
+    
+    address internal _policy;
+    address internal _newPolicy;
+
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    constructor () {
+        _policy = msg.sender;
+        emit OwnershipTransferred( address(0), _policy );
+    }
+
+    function policy() public view override returns (address) {
+        return _policy;
+    }
+
+    modifier onlyPolicy() {
+        require( _policy == msg.sender, "Ownable: caller is not the owner" );
+        _;
+    }
+
+    function renouncePolicy() public virtual override onlyPolicy() {
+        emit OwnershipTransferred( _policy, address(0) );
+        _policy = address(0);
+    }
+
+    function pushPolicy( address newPolicy_ ) public virtual override onlyPolicy() {
+        require( newPolicy_ != address(0), "Ownable: new owner is the zero address");
+        _newPolicy = newPolicy_;
+    }
+
+    function pullPolicy() public virtual override {
+        require( msg.sender == _newPolicy );
+        emit OwnershipTransferred( _policy, _newPolicy );
+        _policy = _newPolicy;
+    }
 }
 
-contract OlympusBondingCalculator is IBondingCalculator {
+interface ITreasury {
+    function mintRewards( address _recipient, uint _amount ) external;
+}
 
-    using FixedPoint for *;
+contract Distributor is Policy {
     using SafeMath for uint;
-    using SafeMath for uint112;
+    using SafeMath for uint32;
+    using SafeERC20 for IERC20;
+    
+    
+    
+    /* ====== VARIABLES ====== */
 
     address public immutable OHM;
-
-    constructor( address _OHM ) {
-        require( _OHM != address(0) );
-        OHM = _OHM;
+    address public immutable treasury;
+    
+    uint32 public immutable epochLength;
+    uint32 public nextEpochTime;
+    
+    mapping( uint => Adjust ) public adjustments;
+    
+    
+    /* ====== STRUCTS ====== */
+        
+    struct Info {
+        uint rate; // in ten-thousandths ( 5000 = 0.5% )
+        address recipient;
     }
-
-    function getKValue( address _pair ) public view returns( uint k_ ) {
-        uint token0 = IERC20( IUniswapV2Pair( _pair ).token0() ).decimals();
-        uint token1 = IERC20( IUniswapV2Pair( _pair ).token1() ).decimals();
-        uint decimals = token0.add( token1 ).sub( IERC20( _pair ).decimals() );
-
-        (uint reserve0, uint reserve1, ) = IUniswapV2Pair( _pair ).getReserves();
-        k_ = reserve0.mul(reserve1).div( 10 ** decimals );
+    Info[] public info;
+    
+    struct Adjust {
+        bool add;
+        uint rate;
+        uint target;
     }
+    
+    
+    
+    /* ====== CONSTRUCTOR ====== */
 
-    function getTotalValue( address _pair ) public view returns ( uint _value ) {
-        _value = getKValue( _pair ).sqrrt().mul(2);
+    constructor( address _treasury, address _ohm, uint32 _epochLength, uint32 _nextEpochTime ) {        
+        require( _treasury != address(0) );
+        treasury = _treasury;
+        require( _ohm != address(0) );
+        OHM = _ohm;
+        epochLength = _epochLength;
+        nextEpochTime = _nextEpochTime;
     }
-
-    function valuation( address _pair, uint amount_ ) external view override returns ( uint _value ) {
-        uint totalValue = getTotalValue( _pair );
-        uint totalSupply = IUniswapV2Pair( _pair ).totalSupply();
-
-        _value = totalValue.mul( FixedPoint.fraction( amount_, totalSupply ).decode112with18() ).div( 1e18 );
-    }
-
-    function markdown( address _pair ) external view returns ( uint ) {
-        ( uint reserve0, uint reserve1, ) = IUniswapV2Pair( _pair ).getReserves();
-
-        uint reserve;
-        if ( IUniswapV2Pair( _pair ).token0() == OHM ) {
-            reserve = reserve1;
-        } else {
-            reserve = reserve0;
+    
+    
+    
+    /* ====== PUBLIC FUNCTIONS ====== */
+    
+    /**
+        @notice send epoch reward to staking contract
+     */
+    function distribute() external returns ( bool ) {
+        if ( nextEpochTime <= uint32(block.timestamp) ) {
+            nextEpochTime = nextEpochTime.add32( epochLength ); // set next epoch time
+            
+            // distribute rewards to each recipient
+            for ( uint i = 0; i < info.length; i++ ) {
+                if ( info[ i ].rate > 0 ) {
+                    ITreasury( treasury ).mintRewards( // mint and send from treasury
+                        info[ i ].recipient, 
+                        nextRewardAt( info[ i ].rate ) 
+                    );
+                    adjust( i ); // check for adjustment
+                }
+            }
+            return true;
+        } else { 
+            return false; 
         }
-        return reserve.mul( 2 * ( 10 ** IERC20( OHM ).decimals() ) ).div( getTotalValue( _pair ) );
+    }
+    
+    
+    
+    /* ====== INTERNAL FUNCTIONS ====== */
+
+    /**
+        @notice increment reward rate for collector
+     */
+    function adjust( uint _index ) internal {
+        Adjust memory adjustment = adjustments[ _index ];
+        if ( adjustment.rate != 0 ) {
+            if ( adjustment.add ) { // if rate should increase
+                info[ _index ].rate = info[ _index ].rate.add( adjustment.rate ); // raise rate
+                if ( info[ _index ].rate >= adjustment.target ) { // if target met
+                    adjustments[ _index ].rate = 0; // turn off adjustment
+                }
+            } else { // if rate should decrease
+                info[ _index ].rate = info[ _index ].rate.sub( adjustment.rate ); // lower rate
+                if ( info[ _index ].rate <= adjustment.target ) { // if target met
+                    adjustments[ _index ].rate = 0; // turn off adjustment
+                }
+            }
+        }
+    }
+    
+    
+    
+    /* ====== VIEW FUNCTIONS ====== */
+
+    /**
+        @notice view function for next reward at given rate
+        @param _rate uint
+        @return uint
+     */
+    function nextRewardAt( uint _rate ) public view returns ( uint ) {
+        return IERC20( OHM ).totalSupply().mul( _rate ).div( 1000000 );
+    }
+
+    /**
+        @notice view function for next reward for specified address
+        @param _recipient address
+        @return uint
+     */
+    function nextRewardFor( address _recipient ) public view returns ( uint ) {
+        uint reward;
+        for ( uint i = 0; i < info.length; i++ ) {
+            if ( info[ i ].recipient == _recipient ) {
+                reward = nextRewardAt( info[ i ].rate );
+            }
+        }
+        return reward;
+    }
+    
+    
+    
+    /* ====== POLICY FUNCTIONS ====== */
+
+    /**
+        @notice adds recipient for distributions
+        @param _recipient address
+        @param _rewardRate uint
+     */
+    function addRecipient( address _recipient, uint _rewardRate ) external onlyPolicy() {
+        require( _recipient != address(0) );
+        info.push( Info({
+            recipient: _recipient,
+            rate: _rewardRate
+        }));
+    }
+
+    /**
+        @notice removes recipient for distributions
+        @param _index uint
+        @param _recipient address
+     */
+    function removeRecipient( uint _index, address _recipient ) external onlyPolicy() {
+        require( _recipient == info[ _index ].recipient );
+        info[ _index ].recipient = address(0);
+        info[ _index ].rate = 0;
+    }
+
+    /**
+        @notice set adjustment info for a collector's reward rate
+        @param _index uint
+        @param _add bool
+        @param _rate uint
+        @param _target uint
+     */
+    function setAdjustment( uint _index, bool _add, uint _rate, uint _target ) external onlyPolicy() {
+        adjustments[ _index ] = Adjust({
+            add: _add,
+            rate: _rate,
+            target: _target
+        });
     }
 }
-
-
-
-//0x01884c8fba9e2c510093d2af308e7a8ba7060b8f //32 days -----/
-
-
-
-
-
-
-
-
