@@ -1,5 +1,5 @@
 /**
- *Submitted for verification at snowtrace.io on 2021-11-29
+ *Submitted for verification at FtmScan.com on 2021-10-25
 */
 
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -18,12 +18,6 @@ library SafeMath {
      */
     function add(uint256 a, uint256 b) internal pure returns (uint256) {
         uint256 c = a + b;
-        require(c >= a, "SafeMath: addition overflow");
-
-        return c;
-    }
-    function add32(uint32 a, uint32 b) internal pure returns (uint32) {
-        uint32 c = a + b;
         require(c >= a, "SafeMath: addition overflow");
 
         return c;
@@ -235,7 +229,8 @@ library Address {
      *
      * IMPORTANT: because control is transferred to `recipient`, care must be
      * taken to not create reentrancy vulnerabilities. Consider using
-     * {ReentrancyGuard}
+     * {ReentrancyGuard} or the
+     * https://solidity.readthedocs.io/en/v0.5.11/security-considerations.html#use-the-checks-effects-interactions-pattern[checks-effects-interactions pattern].
      */
     function sendValue(address payable recipient, uint256 amount) internal {
         require(address(this).balance >= amount, "Address: insufficient balance");
@@ -253,6 +248,8 @@ library Address {
      * If `target` reverts with a revert reason, it is bubbled up by this
      * function (like regular Solidity function calls).
      *
+     * Returns the raw returned data. To convert to the expected return value,
+     * use https://solidity.readthedocs.io/en/latest/units-and-global-variables.html?highlight=abi.decode#abi-encoding-and-decoding-functions[`abi.decode`].
      *
      * Requirements:
      *
@@ -271,11 +268,7 @@ library Address {
      *
      * _Available since v3.1._
      */
-    function functionCall(
-        address target,
-        bytes memory data,
-        string memory errorMessage
-    ) internal returns (bytes memory) {
+    function functionCall(address target, bytes memory data, string memory errorMessage) internal returns (bytes memory) {
         return _functionCallWithValue(target, data, 0, errorMessage);
     }
 
@@ -300,12 +293,7 @@ library Address {
      *
      * _Available since v3.1._
      */
-    function functionCallWithValue(
-        address target, 
-        bytes memory data, 
-        uint256 value, 
-        string memory errorMessage
-    ) internal returns (bytes memory) {
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
         require(address(this).balance >= value, "Address: insufficient balance for call");
         require(isContract(target), "Address: call to non-contract");
 
@@ -314,12 +302,7 @@ library Address {
         return _verifyCallResult(success, returndata, errorMessage);
     }
 
-    function _functionCallWithValue(
-        address target, 
-        bytes memory data, 
-        uint256 weiValue, 
-        string memory errorMessage
-    ) private returns (bytes memory) {
+    function _functionCallWithValue(address target, bytes memory data, uint256 weiValue, string memory errorMessage) private returns (bytes memory) {
         require(isContract(target), "Address: call to non-contract");
 
         // solhint-disable-next-line avoid-low-level-calls
@@ -358,11 +341,7 @@ library Address {
      *
      * _Available since v3.3._
      */
-    function functionStaticCall(
-        address target, 
-        bytes memory data, 
-        string memory errorMessage
-    ) internal view returns (bytes memory) {
+    function functionStaticCall(address target, bytes memory data, string memory errorMessage) internal view returns (bytes memory) {
         require(isContract(target), "Address: static call to non-contract");
 
         // solhint-disable-next-line avoid-low-level-calls
@@ -386,11 +365,7 @@ library Address {
      *
      * _Available since v3.3._
      */
-    function functionDelegateCall(
-        address target, 
-        bytes memory data, 
-        string memory errorMessage
-    ) internal returns (bytes memory) {
+    function functionDelegateCall(address target, bytes memory data, string memory errorMessage) internal returns (bytes memory) {
         require(isContract(target), "Address: delegate call to non-contract");
 
         // solhint-disable-next-line avoid-low-level-calls
@@ -398,11 +373,7 @@ library Address {
         return _verifyCallResult(success, returndata, errorMessage);
     }
 
-    function _verifyCallResult(
-        bool success, 
-        bytes memory returndata, 
-        string memory errorMessage
-    ) private pure returns(bytes memory) {
+    function _verifyCallResult(bool success, bytes memory returndata, string memory errorMessage) private pure returns(bytes memory) {
         if (success) {
             return returndata;
         } else {
@@ -474,13 +445,8 @@ library SafeERC20 {
         _callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, newAllowance));
     }
 
-    function safeDecreaseAllowance(
-        IERC20 token, 
-        address spender, 
-        uint256 value
-    ) internal {
-        uint256 newAllowance = token.allowance(address(this), spender)
-            .sub(value, "SafeERC20: decreased allowance below zero");
+    function safeDecreaseAllowance(IERC20 token, address spender, uint256 value) internal {
+        uint256 newAllowance = token.allowance(address(this), spender).sub(value, "SafeERC20: decreased allowance below zero");
         _callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, newAllowance));
     }
 
@@ -553,7 +519,7 @@ contract Ownable is IOwnable {
     }
 }
 
-interface IMemo {
+interface IsOHM {
     function rebase( uint256 ohmProfit_, uint epoch_) external returns (uint256);
 
     function circulatingSupply() external view returns (uint256);
@@ -575,20 +541,19 @@ interface IDistributor {
     function distribute() external returns ( bool );
 }
 
-contract TimeStaking is Ownable {
+contract OlympusStaking is Ownable {
 
     using SafeMath for uint256;
-    using SafeMath for uint32;
     using SafeERC20 for IERC20;
 
-    address public immutable Time;
-    address public immutable Memories;
+    address public immutable OHM;
+    address public immutable sOHM;
 
     struct Epoch {
+        uint length;
         uint number;
+        uint endBlock;
         uint distribute;
-        uint32 length;
-        uint32 endTime;
     }
     Epoch public epoch;
 
@@ -601,21 +566,21 @@ contract TimeStaking is Ownable {
     uint public warmupPeriod;
     
     constructor ( 
-        address _Time, 
-        address _Memories, 
-        uint32 _epochLength,
+        address _OHM, 
+        address _sOHM, 
+        uint _epochLength,
         uint _firstEpochNumber,
-        uint32 _firstEpochTime
+        uint _firstEpochBlock
     ) {
-        require( _Time != address(0) );
-        Time = _Time;
-        require( _Memories != address(0) );
-        Memories = _Memories;
+        require( _OHM != address(0) );
+        OHM = _OHM;
+        require( _sOHM != address(0) );
+        sOHM = _sOHM;
         
         epoch = Epoch({
             length: _epochLength,
             number: _firstEpochNumber,
-            endTime: _firstEpochTime,
+            endBlock: _firstEpochBlock,
             distribute: 0
         });
     }
@@ -636,19 +601,19 @@ contract TimeStaking is Ownable {
     function stake( uint _amount, address _recipient ) external returns ( bool ) {
         rebase();
         
-        IERC20( Time ).safeTransferFrom( msg.sender, address(this), _amount );
+        IERC20( OHM ).safeTransferFrom( msg.sender, address(this), _amount );
 
         Claim memory info = warmupInfo[ _recipient ];
         require( !info.lock, "Deposits for account are locked" );
 
         warmupInfo[ _recipient ] = Claim ({
             deposit: info.deposit.add( _amount ),
-            gons: info.gons.add( IMemo( Memories ).gonsForBalance( _amount ) ),
+            gons: info.gons.add( IsOHM( sOHM ).gonsForBalance( _amount ) ),
             expiry: epoch.number.add( warmupPeriod ),
             lock: false
         });
         
-        IERC20( Memories ).safeTransfer( warmupContract, _amount );
+        IERC20( sOHM ).safeTransfer( warmupContract, _amount );
         return true;
     }
 
@@ -660,7 +625,7 @@ contract TimeStaking is Ownable {
         Claim memory info = warmupInfo[ _recipient ];
         if ( epoch.number >= info.expiry && info.expiry != 0 ) {
             delete warmupInfo[ _recipient ];
-            IWarmup( warmupContract ).retrieve( _recipient, IMemo( Memories ).balanceForGons( info.gons ) );
+            IWarmup( warmupContract ).retrieve( _recipient, IsOHM( sOHM ).balanceForGons( info.gons ) );
         }
     }
 
@@ -671,8 +636,8 @@ contract TimeStaking is Ownable {
         Claim memory info = warmupInfo[ msg.sender ];
         delete warmupInfo[ msg.sender ];
 
-        IWarmup( warmupContract ).retrieve( address(this), IMemo( Memories ).balanceForGons( info.gons ) );
-        IERC20( Time ).safeTransfer( msg.sender, info.deposit );
+        IWarmup( warmupContract ).retrieve( address(this), IsOHM( sOHM ).balanceForGons( info.gons ) );
+        IERC20( OHM ).safeTransfer( msg.sender, info.deposit );
     }
 
     /**
@@ -691,8 +656,8 @@ contract TimeStaking is Ownable {
         if ( _trigger ) {
             rebase();
         }
-        IERC20( Memories ).safeTransferFrom( msg.sender, address(this), _amount );
-        IERC20( Time ).safeTransfer( msg.sender, _amount );
+        IERC20( sOHM ).safeTransferFrom( msg.sender, address(this), _amount );
+        IERC20( OHM ).safeTransfer( msg.sender, _amount );
     }
 
     /**
@@ -700,18 +665,18 @@ contract TimeStaking is Ownable {
         @return uint
      */
     function index() public view returns ( uint ) {
-        return IMemo( Memories ).index();
+        return IsOHM( sOHM ).index();
     }
 
     /**
         @notice trigger rebase if epoch over
      */
     function rebase() public {
-        if( epoch.endTime <= uint32(block.timestamp) ) {
+        if( epoch.endBlock <= block.number ) {
 
-            IMemo( Memories ).rebase( epoch.distribute, epoch.number );
+            IsOHM( sOHM ).rebase( epoch.distribute, epoch.number );
 
-            epoch.endTime = epoch.endTime.add32( epoch.length );
+            epoch.endBlock = epoch.endBlock.add( epoch.length );
             epoch.number++;
             
             if ( distributor != address(0) ) {
@@ -719,7 +684,7 @@ contract TimeStaking is Ownable {
             }
 
             uint balance = contractBalance();
-            uint staked = IMemo( Memories ).circulatingSupply();
+            uint staked = IsOHM( sOHM ).circulatingSupply();
 
             if( balance <= staked ) {
                 epoch.distribute = 0;
@@ -734,7 +699,7 @@ contract TimeStaking is Ownable {
         @return uint
      */
     function contractBalance() public view returns ( uint ) {
-        return IERC20( Time ).balanceOf( address(this) ).add( totalBonus );
+        return IERC20( OHM ).balanceOf( address(this) ).add( totalBonus );
     }
 
     /**
@@ -744,7 +709,7 @@ contract TimeStaking is Ownable {
     function giveLockBonus( uint _amount ) external {
         require( msg.sender == locker );
         totalBonus = totalBonus.add( _amount );
-        IERC20( Memories ).safeTransfer( locker, _amount );
+        IERC20( sOHM ).safeTransfer( locker, _amount );
     }
 
     /**
@@ -754,7 +719,7 @@ contract TimeStaking is Ownable {
     function returnLockBonus( uint _amount ) external {
         require( msg.sender == locker );
         totalBonus = totalBonus.sub( _amount );
-        IERC20( Memories ).safeTransferFrom( locker, address(this), _amount );
+        IERC20( sOHM ).safeTransferFrom( locker, address(this), _amount );
     }
 
     enum CONTRACTS { DISTRIBUTOR, WARMUP, LOCKER }
@@ -776,10 +741,24 @@ contract TimeStaking is Ownable {
     }
     
     /**
-     * @notice set warmup period in epoch's numbers for new stakers
+     * @notice set warmup period for new stakers
      * @param _warmupPeriod uint
      */
     function setWarmup( uint _warmupPeriod ) external onlyManager() {
         warmupPeriod = _warmupPeriod;
     }
 }
+
+
+
+
+//0x8b8d40f98a2f14e2dd972b3f2e2a2cc227d1e3be //active -----/
+
+
+
+
+
+
+
+
+
