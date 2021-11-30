@@ -1,5 +1,5 @@
 /**
- *Submitted for verification at snowtrace.io on 2021-11-29
+ *Submitted for verification at FtmScan.com on 2021-10-25
 */
 
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -263,17 +263,17 @@ interface IBondingCalculator {
   function valuation( address pair_, uint amount_ ) external view returns ( uint _value );
 }
 
-contract TimeBondingCalculator is IBondingCalculator {
+contract OlympusBondingCalculator is IBondingCalculator {
 
     using FixedPoint for *;
     using SafeMath for uint;
     using SafeMath for uint112;
 
-    address public immutable Time;
+    address public immutable OHM;
 
-    constructor( address _Time ) {
-        require( _Time != address(0) );
-        Time = _Time;
+    constructor( address _OHM ) {
+        require( _OHM != address(0) );
+        OHM = _OHM;
     }
 
     function getKValue( address _pair ) public view returns( uint k_ ) {
@@ -300,11 +300,23 @@ contract TimeBondingCalculator is IBondingCalculator {
         ( uint reserve0, uint reserve1, ) = IUniswapV2Pair( _pair ).getReserves();
 
         uint reserve;
-        if ( IUniswapV2Pair( _pair ).token0() == Time ) {
+        if ( IUniswapV2Pair( _pair ).token0() == OHM ) {
             reserve = reserve1;
         } else {
             reserve = reserve0;
         }
-        return reserve.mul( 2 * ( 10 ** IERC20( Time ).decimals() ) ).div( getTotalValue( _pair ) );
+        return reserve.mul( 2 * ( 10 ** IERC20( OHM ).decimals() ) ).div( getTotalValue( _pair ) );
     }
 }
+
+
+
+//0x01884c8fba9e2c510093d2af308e7a8ba7060b8f //32 days -----/
+
+
+
+
+
+
+
+
