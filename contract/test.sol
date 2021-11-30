@@ -1,9 +1,191 @@
 /**
- *Submitted for verification at FtmScan.com on 2021-10-25
+ *Submitted for verification at snowtrace.io on 2021-11-29
 */
 
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.7.5;
+
+library FullMath {
+    function fullMul(uint256 x, uint256 y) private pure returns (uint256 l, uint256 h) {
+        uint256 mm = mulmod(x, y, uint256(-1));
+        l = x * y;
+        h = mm - l;
+        if (mm < l) h -= 1;
+    }
+
+    function fullDiv(
+        uint256 l,
+        uint256 h,
+        uint256 d
+    ) private pure returns (uint256) {
+        uint256 pow2 = d & -d;
+        d /= pow2;
+        l /= pow2;
+        l += h * ((-pow2) / pow2 + 1);
+        uint256 r = 1;
+        r *= 2 - d * r;
+        r *= 2 - d * r;
+        r *= 2 - d * r;
+        r *= 2 - d * r;
+        r *= 2 - d * r;
+        r *= 2 - d * r;
+        r *= 2 - d * r;
+        r *= 2 - d * r;
+        return l * r;
+    }
+
+    function mulDiv(
+        uint256 x,
+        uint256 y,
+        uint256 d
+    ) internal pure returns (uint256) {
+        (uint256 l, uint256 h) = fullMul(x, y);
+        uint256 mm = mulmod(x, y, d);
+        if (mm > l) h -= 1;
+        l -= mm;
+        require(h < d, 'FullMath::mulDiv: overflow');
+        return fullDiv(l, h, d);
+    }
+}
+
+library Babylonian {
+
+    function sqrt(uint256 x) internal pure returns (uint256) {
+        if (x == 0) return 0;
+
+        uint256 xx = x;
+        uint256 r = 1;
+        if (xx >= 0x100000000000000000000000000000000) {
+            xx >>= 128;
+            r <<= 64;
+        }
+        if (xx >= 0x10000000000000000) {
+            xx >>= 64;
+            r <<= 32;
+        }
+        if (xx >= 0x100000000) {
+            xx >>= 32;
+            r <<= 16;
+        }
+        if (xx >= 0x10000) {
+            xx >>= 16;
+            r <<= 8;
+        }
+        if (xx >= 0x100) {
+            xx >>= 8;
+            r <<= 4;
+        }
+        if (xx >= 0x10) {
+            xx >>= 4;
+            r <<= 2;
+        }
+        if (xx >= 0x8) {
+            r <<= 1;
+        }
+        r = (r + x / r) >> 1;
+        r = (r + x / r) >> 1;
+        r = (r + x / r) >> 1;
+        r = (r + x / r) >> 1;
+        r = (r + x / r) >> 1;
+        r = (r + x / r) >> 1;
+        r = (r + x / r) >> 1; // Seven iterations should be enough
+        uint256 r1 = x / r;
+        return (r < r1 ? r : r1);
+    }
+}
+
+library BitMath {
+
+    function mostSignificantBit(uint256 x) internal pure returns (uint8 r) {
+        require(x > 0, 'BitMath::mostSignificantBit: zero');
+
+        if (x >= 0x100000000000000000000000000000000) {
+            x >>= 128;
+            r += 128;
+        }
+        if (x >= 0x10000000000000000) {
+            x >>= 64;
+            r += 64;
+        }
+        if (x >= 0x100000000) {
+            x >>= 32;
+            r += 32;
+        }
+        if (x >= 0x10000) {
+            x >>= 16;
+            r += 16;
+        }
+        if (x >= 0x100) {
+            x >>= 8;
+            r += 8;
+        }
+        if (x >= 0x10) {
+            x >>= 4;
+            r += 4;
+        }
+        if (x >= 0x4) {
+            x >>= 2;
+            r += 2;
+        }
+        if (x >= 0x2) r += 1;
+    }
+}
+
+library FixedPoint {
+    // range: [0, 2**112 - 1]
+    // resolution: 1 / 2**112
+    struct uq112x112 {
+        uint224 _x;
+    }
+
+    // range: [0, 2**144 - 1]
+    // resolution: 1 / 2**112
+    struct uq144x112 {
+        uint256 _x;
+    }
+
+    uint8 private constant RESOLUTION = 112;
+    uint256 private constant Q112 = 0x10000000000000000000000000000;
+    uint256 private constant Q224 = 0x100000000000000000000000000000000000000000000000000000000;
+    uint256 private constant LOWER_MASK = 0xffffffffffffffffffffffffffff; // decimal of UQ*x112 (lower 112 bits)
+
+    // decode a UQ112x112 into a uint112 by truncating after the radix point
+    function decode(uq112x112 memory self) internal pure returns (uint112) {
+        return uint112(self._x >> RESOLUTION);
+    }
+
+    // decode a uq112x112 into a uint with 18 decimals of precision
+    function decode112with18(uq112x112 memory self) internal pure returns (uint) {
+        return uint(self._x) / 5192296858534827;
+    }
+
+    function fraction(uint256 numerator, uint256 denominator) internal pure returns (uq112x112 memory) {
+        require(denominator > 0, 'FixedPoint::fraction: division by zero');
+        if (numerator == 0) return FixedPoint.uq112x112(0);
+
+        if (numerator <= uint144(-1)) {
+            uint256 result = (numerator << RESOLUTION) / denominator;
+            require(result <= uint224(-1), 'FixedPoint::fraction: overflow');
+            return uq112x112(uint224(result));
+        } else {
+            uint256 result = FullMath.mulDiv(numerator, Q112, denominator);
+            require(result <= uint224(-1), 'FixedPoint::fraction: overflow');
+            return uq112x112(uint224(result));
+        }
+    }
+
+    // square root of a UQ112x112
+    // lossy between 0/1 and 40 bits
+    function sqrt(uq112x112 memory self) internal pure returns (uq112x112 memory) {
+        if (self._x <= uint144(-1)) {
+            return uq112x112(uint224(Babylonian.sqrt(uint256(self._x) << 112)));
+        }
+
+        uint8 safeShiftBits = 255 - BitMath.mostSignificantBit(self._x);
+        safeShiftBits -= safeShiftBits % 2;
+        return uq112x112(uint224(Babylonian.sqrt(uint256(self._x) << safeShiftBits) << ((112 - safeShiftBits) / 2)));
+    }
+}
 
 library SafeMath {
 
@@ -26,6 +208,7 @@ library SafeMath {
     }
 
     function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+
         if (a == 0) {
             return 0;
         }
@@ -43,632 +226,85 @@ library SafeMath {
     function div(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
         require(b > 0, errorMessage);
         uint256 c = a / b;
+        // assert(a == b * c + a % b); // There is no case in which this doesn't hold
+
         return c;
     }
-}
 
-library Address {
-
-  function isContract(address account) internal view returns (bool) {
-        // This method relies in extcodesize, which returns 0 for contracts in
-        // construction, since the code is only stored at the end of the
-        // constructor execution.
-
-        uint256 size;
-        // solhint-disable-next-line no-inline-assembly
-        assembly { size := extcodesize(account) }
-        return size > 0;
-    }
-
-    function functionCall(address target, bytes memory data, string memory errorMessage) internal returns (bytes memory) {
-        return _functionCallWithValue(target, data, 0, errorMessage);
-    }
-
-    function _functionCallWithValue(address target, bytes memory data, uint256 weiValue, string memory errorMessage) private returns (bytes memory) {
-        require(isContract(target), "Address: call to non-contract");
-
-        // solhint-disable-next-line avoid-low-level-calls
-        (bool success, bytes memory returndata) = target.call{ value: weiValue }(data);
-        if (success) {
-            return returndata;
-        } else {
-            if (returndata.length > 0) {
-                // solhint-disable-next-line no-inline-assembly
-                assembly {
-                    let returndata_size := mload(returndata)
-                    revert(add(32, returndata), returndata_size)
-                }
-            } else {
-                revert(errorMessage);
+    function sqrrt(uint256 a) internal pure returns (uint c) {
+        if (a > 3) {
+            c = a;
+            uint b = add( div( a, 2), 1 );
+            while (b < c) {
+                c = b;
+                b = div( add( div( a, b ), b), 2 );
             }
+        } else if (a != 0) {
+            c = 1;
         }
-    }
-
-    function _verifyCallResult(bool success, bytes memory returndata, string memory errorMessage) private pure returns(bytes memory) {
-        if (success) {
-            return returndata;
-        } else {
-            if (returndata.length > 0) {
-                // solhint-disable-next-line no-inline-assembly
-                assembly {
-                    let returndata_size := mload(returndata)
-                    revert(add(32, returndata), returndata_size)
-                }
-            } else {
-                revert(errorMessage);
-            }
-        }
-    }
-}
-
-interface IOwnable {
-  function manager() external view returns (address);
-
-  function renounceManagement() external;
-  
-  function pushManagement( address newOwner_ ) external;
-  
-  function pullManagement() external;
-}
-
-contract Ownable is IOwnable {
-
-    address internal _owner;
-    address internal _newOwner;
-
-    event OwnershipPushed(address indexed previousOwner, address indexed newOwner);
-    event OwnershipPulled(address indexed previousOwner, address indexed newOwner);
-
-    constructor () {
-        _owner = msg.sender;
-        emit OwnershipPushed( address(0), _owner );
-    }
-
-    function manager() public view override returns (address) {
-        return _owner;
-    }
-
-    modifier onlyManager() {
-        require( _owner == msg.sender, "Ownable: caller is not the owner" );
-        _;
-    }
-
-    function renounceManagement() public virtual override onlyManager() {
-        emit OwnershipPushed( _owner, address(0) );
-        _owner = address(0);
-    }
-
-    function pushManagement( address newOwner_ ) public virtual override onlyManager() {
-        require( newOwner_ != address(0), "Ownable: new owner is the zero address");
-        emit OwnershipPushed( _owner, newOwner_ );
-        _newOwner = newOwner_;
-    }
-    
-    function pullManagement() public virtual override {
-        require( msg.sender == _newOwner, "Ownable: must be new owner to pull");
-        emit OwnershipPulled( _owner, _newOwner );
-        _owner = _newOwner;
     }
 }
 
 interface IERC20 {
     function decimals() external view returns (uint8);
-
-    function balanceOf(address account) external view returns (uint256);
-
-    function transfer(address recipient, uint256 amount) external returns (bool);
-
-    function approve(address spender, uint256 amount) external returns (bool);
-
-    function totalSupply() external view returns (uint256);
-
-    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-
-    event Transfer(address indexed from, address indexed to, uint256 value);
-
-    event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
-library SafeERC20 {
-    using SafeMath for uint256;
-    using Address for address;
-
-    function safeTransfer(IERC20 token, address to, uint256 value) internal {
-        _callOptionalReturn(token, abi.encodeWithSelector(token.transfer.selector, to, value));
-    }
-
-    function safeTransferFrom(IERC20 token, address from, address to, uint256 value) internal {
-        _callOptionalReturn(token, abi.encodeWithSelector(token.transferFrom.selector, from, to, value));
-    }
-
-    function _callOptionalReturn(IERC20 token, bytes memory data) private {
-        bytes memory returndata = address(token).functionCall(data, "SafeERC20: low-level call failed");
-        if (returndata.length > 0) { // Return data is optional
-            // solhint-disable-next-line max-line-length
-            require(abi.decode(returndata, (bool)), "SafeERC20: ERC20 operation did not succeed");
-        }
-    }
+interface IUniswapV2ERC20 {
+    function totalSupply() external view returns (uint);
 }
 
-interface IERC20Mintable {
-  function mint( uint256 amount_ ) external;
-
-  function mint( address account_, uint256 ammount_ ) external;
+interface IUniswapV2Pair is IUniswapV2ERC20 {
+    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
+    function token0() external view returns ( address );
+    function token1() external view returns ( address );
 }
 
-interface IOHMERC20 {
-    function burnFrom(address account_, uint256 amount_) external;
-}
-
-interface IBondCalculator {
+interface IBondingCalculator {
   function valuation( address pair_, uint amount_ ) external view returns ( uint _value );
 }
 
-contract OlympusTreasury is Ownable {
+contract TimeBondingCalculator is IBondingCalculator {
 
+    using FixedPoint for *;
     using SafeMath for uint;
-    using SafeERC20 for IERC20;
+    using SafeMath for uint112;
 
-    event Deposit( address indexed token, uint amount, uint value );
-    event Withdrawal( address indexed token, uint amount, uint value );
-    event CreateDebt( address indexed debtor, address indexed token, uint amount, uint value );
-    event RepayDebt( address indexed debtor, address indexed token, uint amount, uint value );
-    event ReservesManaged( address indexed token, uint amount );
-    event ReservesUpdated( uint indexed totalReserves );
-    event ReservesAudited( uint indexed totalReserves );
-    event RewardsMinted( address indexed caller, address indexed recipient, uint amount );
-    event ChangeQueued( MANAGING indexed managing, address queued );
-    event ChangeActivated( MANAGING indexed managing, address activated, bool result );
+    address public immutable Time;
 
-    enum MANAGING { RESERVEDEPOSITOR, RESERVESPENDER, RESERVETOKEN, RESERVEMANAGER, LIQUIDITYDEPOSITOR, LIQUIDITYTOKEN, LIQUIDITYMANAGER, DEBTOR, REWARDMANAGER, SOHM }
-
-    address public immutable OHM;
-    uint public immutable blocksNeededForQueue;
-
-    address[] public reserveTokens; // Push only, beware false-positives.
-    mapping( address => bool ) public isReserveToken;
-    mapping( address => uint ) public reserveTokenQueue; // Delays changes to mapping.
-
-    address[] public reserveDepositors; // Push only, beware false-positives. Only for viewing.
-    mapping( address => bool ) public isReserveDepositor;
-    mapping( address => uint ) public reserveDepositorQueue; // Delays changes to mapping.
-
-    address[] public reserveSpenders; // Push only, beware false-positives. Only for viewing.
-    mapping( address => bool ) public isReserveSpender;
-    mapping( address => uint ) public reserveSpenderQueue; // Delays changes to mapping.
-
-    address[] public liquidityTokens; // Push only, beware false-positives.
-    mapping( address => bool ) public isLiquidityToken;
-    mapping( address => uint ) public LiquidityTokenQueue; // Delays changes to mapping.
-
-    address[] public liquidityDepositors; // Push only, beware false-positives. Only for viewing.
-    mapping( address => bool ) public isLiquidityDepositor;
-    mapping( address => uint ) public LiquidityDepositorQueue; // Delays changes to mapping.
-
-    mapping( address => address ) public bondCalculator; // bond calculator for liquidity token
-
-    address[] public reserveManagers; // Push only, beware false-positives. Only for viewing.
-    mapping( address => bool ) public isReserveManager;
-    mapping( address => uint ) public ReserveManagerQueue; // Delays changes to mapping.
-
-    address[] public liquidityManagers; // Push only, beware false-positives. Only for viewing.
-    mapping( address => bool ) public isLiquidityManager;
-    mapping( address => uint ) public LiquidityManagerQueue; // Delays changes to mapping.
-
-    address[] public debtors; // Push only, beware false-positives. Only for viewing.
-    mapping( address => bool ) public isDebtor;
-    mapping( address => uint ) public debtorQueue; // Delays changes to mapping.
-    mapping( address => uint ) public debtorBalance;
-
-    address[] public rewardManagers; // Push only, beware false-positives. Only for viewing.
-    mapping( address => bool ) public isRewardManager;
-    mapping( address => uint ) public rewardManagerQueue; // Delays changes to mapping.
-
-    address public sOHM;
-    uint public sOHMQueue; // Delays change to sOHM address
-    
-    uint public totalReserves; // Risk-free value of all assets
-    uint public totalDebt;
-
-    constructor (
-        address _OHM,
-        address _DAI,
-        uint _blocksNeededForQueue
-    ) {
-        require( _OHM != address(0) );
-        OHM = _OHM;
-
-        isReserveToken[ _DAI ] = true;
-        reserveTokens.push( _DAI );
-
-        blocksNeededForQueue = _blocksNeededForQueue;
+    constructor( address _Time ) {
+        require( _Time != address(0) );
+        Time = _Time;
     }
 
-    /**
-        @notice allow approved address to deposit an asset for OHM
-        @param _amount uint
-        @param _token address
-        @param _profit uint
-        @return send_ uint
-     */
-    function deposit( uint _amount, address _token, uint _profit ) external returns ( uint send_ ) {
-        require( isReserveToken[ _token ] || isLiquidityToken[ _token ], "Not accepted" );
-        IERC20( _token ).safeTransferFrom( msg.sender, address(this), _amount );
+    function getKValue( address _pair ) public view returns( uint k_ ) {
+        uint token0 = IERC20( IUniswapV2Pair( _pair ).token0() ).decimals();
+        uint token1 = IERC20( IUniswapV2Pair( _pair ).token1() ).decimals();
+        uint decimals = token0.add( token1 ).sub( IERC20( _pair ).decimals() );
 
-        if ( isReserveToken[ _token ] ) {
-            require( isReserveDepositor[ msg.sender ], "Not approved" );
+        (uint reserve0, uint reserve1, ) = IUniswapV2Pair( _pair ).getReserves();
+        k_ = reserve0.mul(reserve1).div( 10 ** decimals );
+    }
+
+    function getTotalValue( address _pair ) public view returns ( uint _value ) {
+        _value = getKValue( _pair ).sqrrt().mul(2);
+    }
+
+    function valuation( address _pair, uint amount_ ) external view override returns ( uint _value ) {
+        uint totalValue = getTotalValue( _pair );
+        uint totalSupply = IUniswapV2Pair( _pair ).totalSupply();
+
+        _value = totalValue.mul( FixedPoint.fraction( amount_, totalSupply ).decode112with18() ).div( 1e18 );
+    }
+
+    function markdown( address _pair ) external view returns ( uint ) {
+        ( uint reserve0, uint reserve1, ) = IUniswapV2Pair( _pair ).getReserves();
+
+        uint reserve;
+        if ( IUniswapV2Pair( _pair ).token0() == Time ) {
+            reserve = reserve1;
         } else {
-            require( isLiquidityDepositor[ msg.sender ], "Not approved" );
+            reserve = reserve0;
         }
-
-        uint value = valueOf(_token, _amount);
-        // mint OHM needed and store amount of rewards for distribution
-        send_ = value.sub( _profit );
-        IERC20Mintable( OHM ).mint( msg.sender, send_ );
-
-        totalReserves = totalReserves.add( value );
-        emit ReservesUpdated( totalReserves );
-
-        emit Deposit( _token, _amount, value );
-    }
-
-    /**
-        @notice allow approved address to burn OHM for reserves
-        @param _amount uint
-        @param _token address
-     */
-    function withdraw( uint _amount, address _token ) external {
-        require( isReserveToken[ _token ], "Not accepted" ); // Only reserves can be used for redemptions
-        require( isReserveSpender[ msg.sender ] == true, "Not approved" );
-
-        uint value = valueOf( _token, _amount );
-        IOHMERC20( OHM ).burnFrom( msg.sender, value );
-
-        totalReserves = totalReserves.sub( value );
-        emit ReservesUpdated( totalReserves );
-
-        IERC20( _token ).safeTransfer( msg.sender, _amount );
-
-        emit Withdrawal( _token, _amount, value );
-    }
-
-    /**
-        @notice allow approved address to borrow reserves
-        @param _amount uint
-        @param _token address
-     */
-    function incurDebt( uint _amount, address _token ) external {
-        require( isDebtor[ msg.sender ], "Not approved" );
-        require( isReserveToken[ _token ], "Not accepted" );
-
-        uint value = valueOf( _token, _amount );
-
-        uint maximumDebt = IERC20( sOHM ).balanceOf( msg.sender ); // Can only borrow against sOHM held
-        uint availableDebt = maximumDebt.sub( debtorBalance[ msg.sender ] );
-        require( value <= availableDebt, "Exceeds debt limit" );
-
-        debtorBalance[ msg.sender ] = debtorBalance[ msg.sender ].add( value );
-        totalDebt = totalDebt.add( value );
-
-        totalReserves = totalReserves.sub( value );
-        emit ReservesUpdated( totalReserves );
-
-        IERC20( _token ).transfer( msg.sender, _amount );
-        
-        emit CreateDebt( msg.sender, _token, _amount, value );
-    }
-
-    /**
-        @notice allow approved address to repay borrowed reserves with reserves
-        @param _amount uint
-        @param _token address
-     */
-    function repayDebtWithReserve( uint _amount, address _token ) external {
-        require( isDebtor[ msg.sender ], "Not approved" );
-        require( isReserveToken[ _token ], "Not accepted" );
-
-        IERC20( _token ).safeTransferFrom( msg.sender, address(this), _amount );
-
-        uint value = valueOf( _token, _amount );
-        debtorBalance[ msg.sender ] = debtorBalance[ msg.sender ].sub( value );
-        totalDebt = totalDebt.sub( value );
-
-        totalReserves = totalReserves.add( value );
-        emit ReservesUpdated( totalReserves );
-
-        emit RepayDebt( msg.sender, _token, _amount, value );
-    }
-
-    /**
-        @notice allow approved address to repay borrowed reserves with OHM
-        @param _amount uint
-     */
-    function repayDebtWithOHM( uint _amount ) external {
-        require( isDebtor[ msg.sender ], "Not approved" );
-
-        IOHMERC20( OHM ).burnFrom( msg.sender, _amount );
-
-        debtorBalance[ msg.sender ] = debtorBalance[ msg.sender ].sub( _amount );
-        totalDebt = totalDebt.sub( _amount );
-
-        emit RepayDebt( msg.sender, OHM, _amount, _amount );
-    }
-
-    /**
-        @notice allow approved address to withdraw assets
-        @param _token address
-        @param _amount uint
-     */
-    function manage( address _token, uint _amount ) external {
-        if( isLiquidityToken[ _token ] ) {
-            require( isLiquidityManager[ msg.sender ], "Not approved" );
-        } else {
-            require( isReserveManager[ msg.sender ], "Not approved" );
-        }
-
-        uint value = valueOf(_token, _amount);
-        require( value <= excessReserves(), "Insufficient reserves" );
-
-        totalReserves = totalReserves.sub( value );
-        emit ReservesUpdated( totalReserves );
-
-        IERC20( _token ).safeTransfer( msg.sender, _amount );
-
-        emit ReservesManaged( _token, _amount );
-    }
-
-    /**
-        @notice send epoch reward to staking contract
-     */
-    function mintRewards( address _recipient, uint _amount ) external {
-        require( isRewardManager[ msg.sender ], "Not approved" );
-        require( _amount <= excessReserves(), "Insufficient reserves" );
-
-        IERC20Mintable( OHM ).mint( _recipient, _amount );
-
-        emit RewardsMinted( msg.sender, _recipient, _amount );
-    } 
-
-    /**
-        @notice returns excess reserves not backing tokens
-        @return uint
-     */
-    function excessReserves() public view returns ( uint ) {
-        return totalReserves.sub( IERC20( OHM ).totalSupply().sub( totalDebt ) );
-    }
-
-    /**
-        @notice takes inventory of all tracked assets
-        @notice always consolidate to recognized reserves before audit
-     */
-    function auditReserves() external onlyManager() {
-        uint reserves;
-        for( uint i = 0; i < reserveTokens.length; i++ ) {
-            reserves = reserves.add ( 
-                valueOf( reserveTokens[ i ], IERC20( reserveTokens[ i ] ).balanceOf( address(this) ) )
-            );
-        }
-        for( uint i = 0; i < liquidityTokens.length; i++ ) {
-            reserves = reserves.add (
-                valueOf( liquidityTokens[ i ], IERC20( liquidityTokens[ i ] ).balanceOf( address(this) ) )
-            );
-        }
-        totalReserves = reserves;
-        emit ReservesUpdated( reserves );
-        emit ReservesAudited( reserves );
-    }
-
-    /**
-        @notice returns OHM valuation of asset
-        @param _token address
-        @param _amount uint
-        @return value_ uint
-     */
-    function valueOf( address _token, uint _amount ) public view returns ( uint value_ ) {
-        if ( isReserveToken[ _token ] ) {
-            // convert amount to match OHM decimals
-            value_ = _amount.mul( 10 ** IERC20( OHM ).decimals() ).div( 10 ** IERC20( _token ).decimals() );
-        } else if ( isLiquidityToken[ _token ] ) {
-            value_ = IBondCalculator( bondCalculator[ _token ] ).valuation( _token, _amount );
-        }
-    }
-
-    /**
-        @notice queue address to change boolean in mapping
-        @param _managing MANAGING
-        @param _address address
-        @return bool
-     */
-    function queue( MANAGING _managing, address _address ) external onlyManager() returns ( bool ) {
-        require( _address != address(0) );
-        if ( _managing == MANAGING.RESERVEDEPOSITOR ) { // 0
-            reserveDepositorQueue[ _address ] = block.number.add( blocksNeededForQueue );
-        } else if ( _managing == MANAGING.RESERVESPENDER ) { // 1
-            reserveSpenderQueue[ _address ] = block.number.add( blocksNeededForQueue );
-        } else if ( _managing == MANAGING.RESERVETOKEN ) { // 2
-            reserveTokenQueue[ _address ] = block.number.add( blocksNeededForQueue );
-        } else if ( _managing == MANAGING.RESERVEMANAGER ) { // 3
-            ReserveManagerQueue[ _address ] = block.number.add( blocksNeededForQueue.mul( 2 ) );
-        } else if ( _managing == MANAGING.LIQUIDITYDEPOSITOR ) { // 4
-            LiquidityDepositorQueue[ _address ] = block.number.add( blocksNeededForQueue );
-        } else if ( _managing == MANAGING.LIQUIDITYTOKEN ) { // 5
-            LiquidityTokenQueue[ _address ] = block.number.add( blocksNeededForQueue );
-        } else if ( _managing == MANAGING.LIQUIDITYMANAGER ) { // 6
-            LiquidityManagerQueue[ _address ] = block.number.add( blocksNeededForQueue.mul( 2 ) );
-        } else if ( _managing == MANAGING.DEBTOR ) { // 7
-            debtorQueue[ _address ] = block.number.add( blocksNeededForQueue );
-        } else if ( _managing == MANAGING.REWARDMANAGER ) { // 8
-            rewardManagerQueue[ _address ] = block.number.add( blocksNeededForQueue );
-        } else if ( _managing == MANAGING.SOHM ) { // 9
-            sOHMQueue = block.number.add( blocksNeededForQueue );
-        } else return false;
-
-        emit ChangeQueued( _managing, _address );
-        return true;
-    }
-
-    /**
-        @notice verify queue then set boolean in mapping
-        @param _managing MANAGING
-        @param _address address
-        @param _calculator address
-        @return bool
-     */
-    function toggle( MANAGING _managing, address _address, address _calculator ) external onlyManager() returns ( bool ) {
-        require( _address != address(0) );
-        bool result;
-        if ( _managing == MANAGING.RESERVEDEPOSITOR ) { // 0
-            if ( requirements( reserveDepositorQueue, isReserveDepositor, _address ) ) {
-                reserveDepositorQueue[ _address ] = 0;
-                if( !listContains( reserveDepositors, _address ) ) {
-                    reserveDepositors.push( _address );
-                }
-            }
-            result = !isReserveDepositor[ _address ];
-            isReserveDepositor[ _address ] = result;
-            
-        } else if ( _managing == MANAGING.RESERVESPENDER ) { // 1
-            if ( requirements( reserveSpenderQueue, isReserveSpender, _address ) ) {
-                reserveSpenderQueue[ _address ] = 0;
-                if( !listContains( reserveSpenders, _address ) ) {
-                    reserveSpenders.push( _address );
-                }
-            }
-            result = !isReserveSpender[ _address ];
-            isReserveSpender[ _address ] = result;
-
-        } else if ( _managing == MANAGING.RESERVETOKEN ) { // 2
-            if ( requirements( reserveTokenQueue, isReserveToken, _address ) ) {
-                reserveTokenQueue[ _address ] = 0;
-                if( !listContains( reserveTokens, _address ) ) {
-                    reserveTokens.push( _address );
-                }
-            }
-            result = !isReserveToken[ _address ];
-            isReserveToken[ _address ] = result;
-
-        } else if ( _managing == MANAGING.RESERVEMANAGER ) { // 3
-            if ( requirements( ReserveManagerQueue, isReserveManager, _address ) ) {
-                reserveManagers.push( _address );
-                ReserveManagerQueue[ _address ] = 0;
-                if( !listContains( reserveManagers, _address ) ) {
-                    reserveManagers.push( _address );
-                }
-            }
-            result = !isReserveManager[ _address ];
-            isReserveManager[ _address ] = result;
-
-        } else if ( _managing == MANAGING.LIQUIDITYDEPOSITOR ) { // 4
-            if ( requirements( LiquidityDepositorQueue, isLiquidityDepositor, _address ) ) {
-                liquidityDepositors.push( _address );
-                LiquidityDepositorQueue[ _address ] = 0;
-                if( !listContains( liquidityDepositors, _address ) ) {
-                    liquidityDepositors.push( _address );
-                }
-            }
-            result = !isLiquidityDepositor[ _address ];
-            isLiquidityDepositor[ _address ] = result;
-
-        } else if ( _managing == MANAGING.LIQUIDITYTOKEN ) { // 5
-            if ( requirements( LiquidityTokenQueue, isLiquidityToken, _address ) ) {
-                LiquidityTokenQueue[ _address ] = 0;
-                if( !listContains( liquidityTokens, _address ) ) {
-                    liquidityTokens.push( _address );
-                }
-            }
-            result = !isLiquidityToken[ _address ];
-            isLiquidityToken[ _address ] = result;
-            bondCalculator[ _address ] = _calculator;
-
-        } else if ( _managing == MANAGING.LIQUIDITYMANAGER ) { // 6
-            if ( requirements( LiquidityManagerQueue, isLiquidityManager, _address ) ) {
-                LiquidityManagerQueue[ _address ] = 0;
-                if( !listContains( liquidityManagers, _address ) ) {
-                    liquidityManagers.push( _address );
-                }
-            }
-            result = !isLiquidityManager[ _address ];
-            isLiquidityManager[ _address ] = result;
-
-        } else if ( _managing == MANAGING.DEBTOR ) { // 7
-            if ( requirements( debtorQueue, isDebtor, _address ) ) {
-                debtorQueue[ _address ] = 0;
-                if( !listContains( debtors, _address ) ) {
-                    debtors.push( _address );
-                }
-            }
-            result = !isDebtor[ _address ];
-            isDebtor[ _address ] = result;
-
-        } else if ( _managing == MANAGING.REWARDMANAGER ) { // 8
-            if ( requirements( rewardManagerQueue, isRewardManager, _address ) ) {
-                rewardManagerQueue[ _address ] = 0;
-                if( !listContains( rewardManagers, _address ) ) {
-                    rewardManagers.push( _address );
-                }
-            }
-            result = !isRewardManager[ _address ];
-            isRewardManager[ _address ] = result;
-
-        } else if ( _managing == MANAGING.SOHM ) { // 9
-            sOHMQueue = 0;
-            sOHM = _address;
-            result = true;
-
-        } else return false;
-
-        emit ChangeActivated( _managing, _address, result );
-        return true;
-    }
-
-    /**
-        @notice checks requirements and returns altered structs
-        @param queue_ mapping( address => uint )
-        @param status_ mapping( address => bool )
-        @param _address address
-        @return bool 
-     */
-    function requirements( 
-        mapping( address => uint ) storage queue_, 
-        mapping( address => bool ) storage status_, 
-        address _address 
-    ) internal view returns ( bool ) {
-        if ( !status_[ _address ] ) {
-            require( queue_[ _address ] != 0, "Must queue" );
-            require( queue_[ _address ] <= block.number, "Queue not expired" );
-            return true;
-        } return false;
-    }
-
-    /**
-        @notice checks array to ensure against duplicate
-        @param _list address[]
-        @param _token address
-        @return bool
-     */
-    function listContains( address[] storage _list, address _token ) internal view returns ( bool ) {
-        for( uint i = 0; i < _list.length; i++ ) {
-            if( _list[ i ] == _token ) {
-                return true;
-            }
-        }
-        return false;
+        return reserve.mul( 2 * ( 10 ** IERC20( Time ).decimals() ) ).div( getTotalValue( _pair ) );
     }
 }
-
-
-
-
-//0x6a654d988eebcd9ffb48ecd5af9bd79e090d8347 //15 days -----/
-
-
-
-
-
-
-
-
-
-
-
-
