@@ -1,5 +1,5 @@
 /**
- *Submitted for verification at snowtrace.io on 2021-11-23
+ *Submitted for verification at FtmScan.com on 2021-10-25
 */
 
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -81,17 +81,30 @@ interface IERC20 {
 contract StakingWarmup {
 
     address public immutable staking;
-    address public immutable MEMOries;
+    address public immutable sOHM;
 
-    constructor ( address _staking, address _MEMOries ) {
+    constructor ( address _staking, address _sOHM ) {
         require( _staking != address(0) );
         staking = _staking;
-        require( _MEMOries != address(0) );
-        MEMOries = _MEMOries;
+        require( _sOHM != address(0) );
+        sOHM = _sOHM;
     }
 
     function retrieve( address _staker, uint _amount ) external {
         require( msg.sender == staking );
-        IERC20( MEMOries ).transfer( _staker, _amount );
+        IERC20( sOHM ).transfer( _staker, _amount );
     }
 }
+
+
+
+//0xfb14cce5f6951e6c0935927c00a01fc57ed65920 //22 days -----/
+
+
+
+
+
+
+
+
+
