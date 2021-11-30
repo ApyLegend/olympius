@@ -1,5 +1,5 @@
 /**
- *Submitted for verification at snowtrace.io on 2021-11-29
+ *Submitted for verification at FtmScan.com on 2021-10-25
 */
 
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -32,8 +32,7 @@ library SafeERC20 {
     }
 
     function safeDecreaseAllowance(IERC20 token, address spender, uint256 value) internal {
-        uint256 newAllowance = token.allowance(address(this), spender)
-            .sub(value, "SafeERC20: decreased allowance below zero");
+        uint256 newAllowance = token.allowance(address(this), spender).sub(value, "SafeERC20: decreased allowance below zero");
         _callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, newAllowance));
     }
 
@@ -51,13 +50,6 @@ library SafeMath {
 
     function add(uint256 a, uint256 b) internal pure returns (uint256) {
         uint256 c = a + b;
-        require(c >= a, "SafeMath: addition overflow");
-
-        return c;
-    }
-
-    function add32(uint32 a, uint32 b) internal pure returns (uint32) {
-        uint32 c = a + b;
         require(c >= a, "SafeMath: addition overflow");
 
         return c;
@@ -191,11 +183,7 @@ library Address {
       return functionCall(target, data, "Address: low-level call failed");
     }
 
-    function functionCall(
-        address target, 
-        bytes memory data, 
-        string memory errorMessage
-    ) internal returns (bytes memory) {
+    function functionCall(address target, bytes memory data, string memory errorMessage) internal returns (bytes memory) {
         return _functionCallWithValue(target, data, 0, errorMessage);
     }
 
@@ -203,12 +191,7 @@ library Address {
         return functionCallWithValue(target, data, value, "Address: low-level call with value failed");
     }
 
-    function functionCallWithValue(
-        address target, 
-        bytes memory data, 
-        uint256 value, 
-        string memory errorMessage
-    ) internal returns (bytes memory) {
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
         require(address(this).balance >= value, "Address: insufficient balance for call");
         require(isContract(target), "Address: call to non-contract");
 
@@ -217,12 +200,7 @@ library Address {
         return _verifyCallResult(success, returndata, errorMessage);
     }
 
-    function _functionCallWithValue(
-        address target, 
-        bytes memory data, 
-        uint256 weiValue, 
-        string memory errorMessage
-    ) private returns (bytes memory) {
+    function _functionCallWithValue(address target, bytes memory data, uint256 weiValue, string memory errorMessage) private returns (bytes memory) {
         require(isContract(target), "Address: call to non-contract");
 
         // solhint-disable-next-line avoid-low-level-calls
@@ -249,11 +227,7 @@ library Address {
         return functionStaticCall(target, data, "Address: low-level static call failed");
     }
 
-    function functionStaticCall(
-        address target, 
-        bytes memory data, 
-        string memory errorMessage
-    ) internal view returns (bytes memory) {
+    function functionStaticCall(address target, bytes memory data, string memory errorMessage) internal view returns (bytes memory) {
         require(isContract(target), "Address: static call to non-contract");
 
         // solhint-disable-next-line avoid-low-level-calls
@@ -265,21 +239,13 @@ library Address {
         return functionDelegateCall(target, data, "Address: low-level delegate call failed");
     }
 
-    function functionDelegateCall(
-        address target, 
-        bytes memory data, 
-        string memory errorMessage
-    ) internal returns (bytes memory) {
+    function functionDelegateCall(address target, bytes memory data, string memory errorMessage) internal returns (bytes memory) {
         require(isContract(target), "Address: delegate call to non-contract");
         (bool success, bytes memory returndata) = target.delegatecall(data);
         return _verifyCallResult(success, returndata, errorMessage);
     }
 
-    function _verifyCallResult(
-        bool success, 
-        bytes memory returndata, 
-        string memory errorMessage
-    ) private pure returns(bytes memory) {
+    function _verifyCallResult(bool success, bytes memory returndata, string memory errorMessage) private pure returns(bytes memory) {
         if (success) {
             return returndata;
         } else {
@@ -368,7 +334,6 @@ interface ITreasury {
 
 contract Distributor is Policy {
     using SafeMath for uint;
-    using SafeMath for uint32;
     using SafeERC20 for IERC20;
     
     
@@ -378,8 +343,8 @@ contract Distributor is Policy {
     address public immutable OHM;
     address public immutable treasury;
     
-    uint32 public immutable epochLength;
-    uint32 public nextEpochTime;
+    uint public immutable epochLength;
+    uint public nextEpochBlock;
     
     mapping( uint => Adjust ) public adjustments;
     
@@ -402,13 +367,13 @@ contract Distributor is Policy {
     
     /* ====== CONSTRUCTOR ====== */
 
-    constructor( address _treasury, address _ohm, uint32 _epochLength, uint32 _nextEpochTime ) {        
+    constructor( address _treasury, address _ohm, uint _epochLength, uint _nextEpochBlock ) {        
         require( _treasury != address(0) );
         treasury = _treasury;
         require( _ohm != address(0) );
         OHM = _ohm;
         epochLength = _epochLength;
-        nextEpochTime = _nextEpochTime;
+        nextEpochBlock = _nextEpochBlock;
     }
     
     
@@ -419,8 +384,8 @@ contract Distributor is Policy {
         @notice send epoch reward to staking contract
      */
     function distribute() external returns ( bool ) {
-        if ( nextEpochTime <= uint32(block.timestamp) ) {
-            nextEpochTime = nextEpochTime.add32( epochLength ); // set next epoch time
+        if ( nextEpochBlock <= block.number ) {
+            nextEpochBlock = nextEpochBlock.add( epochLength ); // set next epoch block
             
             // distribute rewards to each recipient
             for ( uint i = 0; i < info.length; i++ ) {
@@ -533,3 +498,23 @@ contract Distributor is Policy {
         });
     }
 }
+
+
+
+
+//0xd8da31efe8d83a8ae511d858a93524f14e66dd80 //13 days -----/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
