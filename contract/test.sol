@@ -1,5 +1,5 @@
 /**
- *Submitted for verification at snowtrace.io on 2021-11-07
+ *Submitted for verification at FtmScan.com on 2021-10-25
 */
 
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -254,7 +254,8 @@ library Address {
      *
      * IMPORTANT: because control is transferred to `recipient`, care must be
      * taken to not create reentrancy vulnerabilities. Consider using
-     * {ReentrancyGuard}
+     * {ReentrancyGuard} or the
+     * https://solidity.readthedocs.io/en/v0.5.11/security-considerations.html#use-the-checks-effects-interactions-pattern[checks-effects-interactions pattern].
      */
     function sendValue(address payable recipient, uint256 amount) internal {
         require(address(this).balance >= amount, "Address: insufficient balance");
@@ -271,6 +272,9 @@ library Address {
      *
      * If `target` reverts with a revert reason, it is bubbled up by this
      * function (like regular Solidity function calls).
+     *
+     * Returns the raw returned data. To convert to the expected return value,
+     * use https://solidity.readthedocs.io/en/latest/units-and-global-variables.html?highlight=abi.decode#abi-encoding-and-decoding-functions[`abi.decode`].
      *
      * Requirements:
      *
@@ -289,11 +293,7 @@ library Address {
      *
      * _Available since v3.1._
      */
-    function functionCall(
-        address target, 
-        bytes memory data, 
-        string memory errorMessage
-    ) internal returns (bytes memory) {
+    function functionCall(address target, bytes memory data, string memory errorMessage) internal returns (bytes memory) {
         return _functionCallWithValue(target, data, 0, errorMessage);
     }
 
@@ -318,12 +318,11 @@ library Address {
      *
      * _Available since v3.1._
      */
-    function functionCallWithValue(
-        address target, 
-        bytes memory data, 
-        uint256 value, 
-        string memory errorMessage
-    ) internal returns (bytes memory) {
+    // function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+    //     require(address(this).balance >= value, "Address: insufficient balance for call");
+    //     return _functionCallWithValue(target, data, value, errorMessage);
+    // }
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
         require(address(this).balance >= value, "Address: insufficient balance for call");
         require(isContract(target), "Address: call to non-contract");
 
@@ -332,12 +331,7 @@ library Address {
         return _verifyCallResult(success, returndata, errorMessage);
     }
 
-    function _functionCallWithValue(
-        address target, 
-        bytes memory data, 
-        uint256 weiValue, 
-        string memory errorMessage
-    ) private returns (bytes memory) {
+    function _functionCallWithValue(address target, bytes memory data, uint256 weiValue, string memory errorMessage) private returns (bytes memory) {
         require(isContract(target), "Address: call to non-contract");
 
         // solhint-disable-next-line avoid-low-level-calls
@@ -376,11 +370,7 @@ library Address {
      *
      * _Available since v3.3._
      */
-    function functionStaticCall(
-        address target, 
-        bytes memory data, 
-        string memory errorMessage
-    ) internal view returns (bytes memory) {
+    function functionStaticCall(address target, bytes memory data, string memory errorMessage) internal view returns (bytes memory) {
         require(isContract(target), "Address: static call to non-contract");
 
         // solhint-disable-next-line avoid-low-level-calls
@@ -404,11 +394,7 @@ library Address {
      *
      * _Available since v3.3._
      */
-    function functionDelegateCall(
-        address target, 
-        bytes memory data, 
-        string memory errorMessage
-    ) internal returns (bytes memory) {
+    function functionDelegateCall(address target, bytes memory data, string memory errorMessage) internal returns (bytes memory) {
         require(isContract(target), "Address: delegate call to non-contract");
 
         // solhint-disable-next-line avoid-low-level-calls
@@ -416,11 +402,7 @@ library Address {
         return _verifyCallResult(success, returndata, errorMessage);
     }
 
-    function _verifyCallResult(
-        bool success, 
-        bytes memory returndata, 
-        string memory errorMessage
-    ) private pure returns(bytes memory) {
+    function _verifyCallResult(bool success, bytes memory returndata, string memory errorMessage) private pure returns(bytes memory) {
         if (success) {
             return returndata;
         } else {
@@ -674,8 +656,7 @@ abstract contract ERC20
     // Present in ERC777
     function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
         _transfer(sender, recipient, amount);
-        _approve(sender, msg.sender, _allowances[sender][msg.sender]
-            .sub(amount, "ERC20: transfer amount exceeds allowance"));
+        _approve(sender, msg.sender, _allowances[sender][msg.sender].sub(amount, "ERC20: transfer amount exceeds allowance"));
         return true;
     }
 
@@ -711,8 +692,7 @@ abstract contract ERC20
      * `subtractedValue`.
      */
     function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
-        _approve(msg.sender, spender, _allowances[msg.sender][spender]
-            .sub(subtractedValue, "ERC20: decreased allowance below zero"));
+        _approve(msg.sender, spender, _allowances[msg.sender][spender].sub(subtractedValue, "ERC20: decreased allowance below zero"));
         return true;
     }
 
@@ -810,6 +790,10 @@ abstract contract ERC20
      * applications that interact with token contracts will not expect
      * {decimals} to ever change, and may work incorrectly if it does.
      */
+    // Considering deprication to reduce size of bytecode as changing _decimals to internal acheived the same functionality.
+    // function _setupDecimals(uint8 decimals_) internal {
+    //     _decimals = decimals_;
+    // }
 
   /**
    * @dev Hook that is called before any transfer of tokens. This includes
@@ -1007,7 +991,7 @@ contract Ownable is IOwnable {
     }
 }
 
-contract MEMOries is ERC20Permit, Ownable {
+contract sOlympus is ERC20Permit, Ownable {
 
     using SafeMath for uint256;
 
@@ -1030,7 +1014,7 @@ contract MEMOries is ERC20Permit, Ownable {
         uint totalStakedAfter;
         uint amountRebased;
         uint index;
-        uint32 timeOccured;
+        uint blockNumberOccured;
     }
     Rebase[] public rebases;
 
@@ -1051,7 +1035,7 @@ contract MEMOries is ERC20Permit, Ownable {
 
     mapping ( address => mapping ( address => uint256 ) ) private _allowedValue;
 
-    constructor() ERC20("MEMOries", "MEMO", 9) ERC20Permit() {
+    constructor() ERC20("Staked Exodia", "sEXOD", 9) ERC20Permit() {
         initializer = msg.sender;
         _totalSupply = INITIAL_FRAGMENTS_SUPPLY;
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
@@ -1077,7 +1061,7 @@ contract MEMOries is ERC20Permit, Ownable {
     }
 
     /**
-        @notice increases MEMOries supply to increase staking balances relative to profit_
+        @notice increases sOHM supply to increase staking balances relative to profit_
         @param profit_ uint256
         @return uint256
      */
@@ -1125,7 +1109,7 @@ contract MEMOries is ERC20Permit, Ownable {
             totalStakedAfter: circulatingSupply(),
             amountRebased: profit_,
             index: index(),
-            timeOccured: uint32(block.timestamp)
+            blockNumberOccured: block.number
         }));
         
         emit LogSupply( epoch_, block.timestamp, _totalSupply );
@@ -1146,7 +1130,7 @@ contract MEMOries is ERC20Permit, Ownable {
         return gons.div( _gonsPerFragment );
     }
 
-    // Staking contract holds excess MEMOries
+    // Staking contract holds excess sOHM
     function circulatingSupply() public view returns ( uint ) {
         return _totalSupply.sub( balanceOf( stakingContract ) );
     }
@@ -1208,3 +1192,16 @@ contract MEMOries is ERC20Permit, Ownable {
         return true;
     }
 }
+
+
+
+//0x8de250c65636ef02a75e4999890c91cecd38d03d //active -----/Staked Exodia (sEXOD)
+
+
+
+
+
+
+
+
+
