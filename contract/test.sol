@@ -1,5 +1,5 @@
 /**
- *Submitted for verification at snowtrace.io on 2021-11-05
+ *Submitted for verification at FtmScan.com on 2021-10-25
 */
 
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -118,8 +118,7 @@ library EnumerableSet {
   // TODO needs insert function that maintains order.
   // TODO needs NatSpec documentation comment.
   /**
-   * Inserts new value by moving existing value at provided index to end 
-   * of array and setting provided value at provided index
+   * Inserts new value by moving existing value at provided index to end of array and setting provided value at provided index
    */
   function _insert(Set storage set_, uint256 index_, bytes32 valueToInsert_ ) private returns ( bool ) {
     require(  set_._values.length > index_ );
@@ -669,8 +668,7 @@ abstract contract ERC20 is IERC20 {
 
     function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
         _transfer(sender, recipient, amount);
-        _approve(sender, msg.sender, _allowances[sender][msg.sender]
-          .sub(amount, "ERC20: transfer amount exceeds allowance"));
+        _approve(sender, msg.sender, _allowances[sender][msg.sender].sub(amount, "ERC20: transfer amount exceeds allowance"));
         return true;
     }
 
@@ -680,8 +678,7 @@ abstract contract ERC20 is IERC20 {
     }
 
     function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
-        _approve(msg.sender, spender, _allowances[msg.sender][spender]
-          .sub(subtractedValue, "ERC20: decreased allowance below zero"));
+        _approve(msg.sender, spender, _allowances[msg.sender][spender].sub(subtractedValue, "ERC20: decreased allowance below zero"));
         return true;
     }
 
@@ -876,11 +873,11 @@ contract VaultOwned is Ownable {
 
 }
 
-contract TimeERC20Token is ERC20Permit, VaultOwned {
+contract OlympusERC20Token is ERC20Permit, VaultOwned {
 
     using SafeMath for uint256;
 
-    constructor() ERC20("Time", "TIME", 9) {
+    constructor() ERC20("Exodia", "EXOD", 9) {
     }
 
     function mint(address account_, uint256 amount_) external onlyVault() {
