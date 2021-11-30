@@ -1,518 +1,21 @@
 /**
- *Submitted for verification at FtmScan.com on 2021-10-25
+ *Submitted for verification at snowtrace.io on 2021-11-29
 */
 
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity 0.7.5;
 
-library EnumerableSet {
-
-  // To implement this library for multiple types with as little code
-  // repetition as possible, we write it in terms of a generic Set type with
-  // bytes32 values.
-  // The Set implementation uses private functions, and user-facing
-  // implementations (such as AddressSet) are just wrappers around the
-  // underlying Set.
-  // This means that we can only create new EnumerableSets for types that fit
-  // in bytes32.
-  struct Set {
-    // Storage of set values
-    bytes32[] _values;
-
-    // Position of the value in the `values` array, plus 1 because index 0
-    // means a value is not in the set.
-    mapping (bytes32 => uint256) _indexes;
-  }
-
-  /**
-   * @dev Add a value to a set. O(1).
-   *
-   * Returns true if the value was added to the set, that is if it was not
-   * already present.
-   */
-  function _add(Set storage set, bytes32 value) private returns (bool) {
-    if (!_contains(set, value)) {
-      set._values.push(value);
-      // The value is stored at length-1, but we add 1 to all indexes
-      // and use 0 as a sentinel value
-      set._indexes[value] = set._values.length;
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  /**
-   * @dev Removes a value from a set. O(1).
-   *
-   * Returns true if the value was removed from the set, that is if it was
-   * present.
-   */
-  function _remove(Set storage set, bytes32 value) private returns (bool) {
-    // We read and store the value's index to prevent multiple reads from the same storage slot
-    uint256 valueIndex = set._indexes[value];
-
-    if (valueIndex != 0) { // Equivalent to contains(set, value)
-      // To delete an element from the _values array in O(1), we swap the element to delete with the last one in
-      // the array, and then remove the last element (sometimes called as 'swap and pop').
-      // This modifies the order of the array, as noted in {at}.
-
-      uint256 toDeleteIndex = valueIndex - 1;
-      uint256 lastIndex = set._values.length - 1;
-
-      // When the value to delete is the last one, the swap operation is unnecessary. However, since this occurs
-      // so rarely, we still do the swap anyway to avoid the gas cost of adding an 'if' statement.
-
-      bytes32 lastvalue = set._values[lastIndex];
-
-      // Move the last value to the index where the value to delete is
-      set._values[toDeleteIndex] = lastvalue;
-      // Update the index for the moved value
-      set._indexes[lastvalue] = toDeleteIndex + 1; // All indexes are 1-based
-
-      // Delete the slot where the moved value was stored
-      set._values.pop();
-
-      // Delete the index for the deleted slot
-      delete set._indexes[value];
-
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  /**
-   * @dev Returns true if the value is in the set. O(1).
-   */
-  function _contains(Set storage set, bytes32 value) private view returns (bool) {
-    return set._indexes[value] != 0;
-  }
-
-  /**
-   * @dev Returns the number of values on the set. O(1).
-   */
-  function _length(Set storage set) private view returns (uint256) {
-    return set._values.length;
-  }
-
-   /**
-    * @dev Returns the value stored at position `index` in the set. O(1).
-    *
-    * Note that there are no guarantees on the ordering of values inside the
-    * array, and it may change when more values are added or removed.
-    *
-    * Requirements:
-    *
-    * - `index` must be strictly less than {length}.
-    */
-  function _at(Set storage set, uint256 index) private view returns (bytes32) {
-    require(set._values.length > index, "EnumerableSet: index out of bounds");
-    return set._values[index];
-  }
-
-  function _getValues( Set storage set_ ) private view returns ( bytes32[] storage ) {
-    return set_._values;
-  }
-
-  // TODO needs insert function that maintains order.
-  // TODO needs NatSpec documentation comment.
-  /**
-   * Inserts new value by moving existing value at provided index to end of array and setting provided value at provided index
-   */
-  function _insert(Set storage set_, uint256 index_, bytes32 valueToInsert_ ) private returns ( bool ) {
-    require(  set_._values.length > index_ );
-    require( !_contains( set_, valueToInsert_ ), "Remove value you wish to insert if you wish to reorder array." );
-    bytes32 existingValue_ = _at( set_, index_ );
-    set_._values[index_] = valueToInsert_;
-    return _add( set_, existingValue_);
-  } 
-
-  struct Bytes4Set {
-    Set _inner;
-  }
-
-  /**
-   * @dev Add a value to a set. O(1).
-   *
-   * Returns true if the value was added to the set, that is if it was not
-   * already present.
-   */
-  function add(Bytes4Set storage set, bytes4 value) internal returns (bool) {
-    return _add(set._inner, value);
-  }
-
-  /**
-   * @dev Removes a value from a set. O(1).
-   *
-   * Returns true if the value was removed from the set, that is if it was
-   * present.
-   */
-  function remove(Bytes4Set storage set, bytes4 value) internal returns (bool) {
-    return _remove(set._inner, value);
-  }
-
-  /**
-   * @dev Returns true if the value is in the set. O(1).
-   */
-  function contains(Bytes4Set storage set, bytes4 value) internal view returns (bool) {
-    return _contains(set._inner, value);
-  }
-
-  /**
-   * @dev Returns the number of values on the set. O(1).
-   */
-  function length(Bytes4Set storage set) internal view returns (uint256) {
-    return _length(set._inner);
-  }
-
-  /**
-   * @dev Returns the value stored at position `index` in the set. O(1).
-   *
-   * Note that there are no guarantees on the ordering of values inside the
-   * array, and it may change when more values are added or removed.
-   *
-   * Requirements:
-   *
-   * - `index` must be strictly less than {length}.
-   */
-  function at(Bytes4Set storage set, uint256 index) internal view returns ( bytes4 ) {
-    return bytes4( _at( set._inner, index ) );
-  }
-
-  function getValues( Bytes4Set storage set_ ) internal view returns ( bytes4[] memory ) {
-    bytes4[] memory bytes4Array_;
-    for( uint256 iteration_ = 0; _length( set_._inner ) > iteration_; iteration_++ ) {
-      bytes4Array_[iteration_] = bytes4( _at( set_._inner, iteration_ ) );
-    }
-    return bytes4Array_;
-  }
-
-  function insert( Bytes4Set storage set_, uint256 index_, bytes4 valueToInsert_ ) internal returns ( bool ) {
-    return _insert( set_._inner, index_, valueToInsert_ );
-  }
-
-    struct Bytes32Set {
-        Set _inner;
-    }
-
-    /**
-     * @dev Add a value to a set. O(1).
-     *
-     * Returns true if the value was added to the set, that is if it was not
-     * already present.
-     */
-    function add(Bytes32Set storage set, bytes32 value) internal returns (bool) {
-        return _add(set._inner, value);
-    }
-
-    /**
-     * @dev Removes a value from a set. O(1).
-     *
-     * Returns true if the value was removed from the set, that is if it was
-     * present.
-     */
-    function remove(Bytes32Set storage set, bytes32 value) internal returns (bool) {
-        return _remove(set._inner, value);
-    }
-
-    /**
-     * @dev Returns true if the value is in the set. O(1).
-     */
-    function contains(Bytes32Set storage set, bytes32 value) internal view returns (bool) {
-        return _contains(set._inner, value);
-    }
-
-    /**
-     * @dev Returns the number of values on the set. O(1).
-     */
-    function length(Bytes32Set storage set) internal view returns (uint256) {
-        return _length(set._inner);
-    }
-
-    /**
-     * @dev Returns the value stored at position `index` in the set. O(1).
-     *
-     * Note that there are no guarantees on the ordering of values inside the
-     * array, and it may change when more values are added or removed.
-     *
-     * Requirements:
-     *
-     * - `index` must be strictly less than {length}.
-     */
-    function at(Bytes32Set storage set, uint256 index) internal view returns ( bytes32 ) {
-        return _at(set._inner, index);
-    }
-
-  function getValues( Bytes32Set storage set_ ) internal view returns ( bytes4[] memory ) {
-    bytes4[] memory bytes4Array_;
-
-      for( uint256 iteration_ = 0; _length( set_._inner ) >= iteration_; iteration_++ ){
-        bytes4Array_[iteration_] = bytes4( at( set_, iteration_ ) );
-      }
-
-      return bytes4Array_;
-  }
-
-  function insert( Bytes32Set storage set_, uint256 index_, bytes32 valueToInsert_ ) internal returns ( bool ) {
-    return _insert( set_._inner, index_, valueToInsert_ );
-  }
-
-  // AddressSet
-  struct AddressSet {
-    Set _inner;
-  }
-
-  /**
-   * @dev Add a value to a set. O(1).
-   *
-   * Returns true if the value was added to the set, that is if it was not
-   * already present.
-   */
-  function add(AddressSet storage set, address value) internal returns (bool) {
-    return _add(set._inner, bytes32(uint256(value)));
-  }
-
-  /**
-   * @dev Removes a value from a set. O(1).
-   *
-   * Returns true if the value was removed from the set, that is if it was
-   * present.
-   */
-  function remove(AddressSet storage set, address value) internal returns (bool) {
-    return _remove(set._inner, bytes32(uint256(value)));
-  }
-
-  /**
-   * @dev Returns true if the value is in the set. O(1).
-   */
-  function contains(AddressSet storage set, address value) internal view returns (bool) {
-    return _contains(set._inner, bytes32(uint256(value)));
-  }
-
-  /**
-   * @dev Returns the number of values in the set. O(1).
-   */
-  function length(AddressSet storage set) internal view returns (uint256) {
-    return _length(set._inner);
-  }
-
-  /**
-   * @dev Returns the value stored at position `index` in the set. O(1).
-   *
-   * Note that there are no guarantees on the ordering of values inside the
-   * array, and it may change when more values are added or removed.
-   *
-   * Requirements:
-   *
-   * - `index` must be strictly less than {length}.
-   */
-  function at(AddressSet storage set, uint256 index) internal view returns (address) {
-    return address(uint256(_at(set._inner, index)));
-  }
-
-  /**
-   * TODO Might require explicit conversion of bytes32[] to address[].
-   *  Might require iteration.
-   */
-  function getValues( AddressSet storage set_ ) internal view returns ( address[] memory ) {
-
-    address[] memory addressArray;
-
-    for( uint256 iteration_ = 0; _length(set_._inner) >= iteration_; iteration_++ ){
-      addressArray[iteration_] = at( set_, iteration_ );
-    }
-
-    return addressArray;
-  }
-
-  function insert(AddressSet storage set_, uint256 index_, address valueToInsert_ ) internal returns ( bool ) {
-    return _insert( set_._inner, index_, bytes32(uint256(valueToInsert_)) );
-  }
-
-
-    // UintSet
-
-    struct UintSet {
-        Set _inner;
-    }
-
-    /**
-     * @dev Add a value to a set. O(1).
-     *
-     * Returns true if the value was added to the set, that is if it was not
-     * already present.
-     */
-    function add(UintSet storage set, uint256 value) internal returns (bool) {
-        return _add(set._inner, bytes32(value));
-    }
-
-    /**
-     * @dev Removes a value from a set. O(1).
-     *
-     * Returns true if the value was removed from the set, that is if it was
-     * present.
-     */
-    function remove(UintSet storage set, uint256 value) internal returns (bool) {
-        return _remove(set._inner, bytes32(value));
-    }
-
-    /**
-     * @dev Returns true if the value is in the set. O(1).
-     */
-    function contains(UintSet storage set, uint256 value) internal view returns (bool) {
-        return _contains(set._inner, bytes32(value));
-    }
-
-    /**
-     * @dev Returns the number of values on the set. O(1).
-     */
-    function length(UintSet storage set) internal view returns (uint256) {
-        return _length(set._inner);
-    }
-
-   /**
-    * @dev Returns the value stored at position `index` in the set. O(1).
-    *
-    * Note that there are no guarantees on the ordering of values inside the
-    * array, and it may change when more values are added or removed.
-    *
-    * Requirements:
-    *
-    * - `index` must be strictly less than {length}.
-    */
-    function at(UintSet storage set, uint256 index) internal view returns (uint256) {
-        return uint256(_at(set._inner, index));
-    }
-
-    struct UInt256Set {
-        Set _inner;
-    }
-
-    /**
-     * @dev Add a value to a set. O(1).
-     *
-     * Returns true if the value was added to the set, that is if it was not
-     * already present.
-     */
-    function add(UInt256Set storage set, uint256 value) internal returns (bool) {
-        return _add(set._inner, bytes32(value));
-    }
-
-    /**
-     * @dev Removes a value from a set. O(1).
-     *
-     * Returns true if the value was removed from the set, that is if it was
-     * present.
-     */
-    function remove(UInt256Set storage set, uint256 value) internal returns (bool) {
-        return _remove(set._inner, bytes32(value));
-    }
-
-    /**
-     * @dev Returns true if the value is in the set. O(1).
-     */
-    function contains(UInt256Set storage set, uint256 value) internal view returns (bool) {
-        return _contains(set._inner, bytes32(value));
-    }
-
-    /**
-     * @dev Returns the number of values on the set. O(1).
-     */
-    function length(UInt256Set storage set) internal view returns (uint256) {
-        return _length(set._inner);
-    }
-
-    /**
-     * @dev Returns the value stored at position `index` in the set. O(1).
-     *
-     * Note that there are no guarantees on the ordering of values inside the
-     * array, and it may change when more values are added or removed.
-     *
-     * Requirements:
-     *
-     * - `index` must be strictly less than {length}.
-     */
-    function at(UInt256Set storage set, uint256 index) internal view returns (uint256) {
-        return uint256(_at(set._inner, index));
-    }
-}
-
-interface IERC20 {
-  /**
-   * @dev Returns the amount of tokens in existence.
-   */
-  function totalSupply() external view returns (uint256);
-
-  /**
-   * @dev Returns the amount of tokens owned by `account`.
-   */
-  function balanceOf(address account) external view returns (uint256);
-
-  /**
-   * @dev Moves `amount` tokens from the caller's account to `recipient`.
-   *
-   * Returns a boolean value indicating whether the operation succeeded.
-   *
-   * Emits a {Transfer} event.
-   */
-  function transfer(address recipient, uint256 amount) external returns (bool);
-
-  /**
-   * @dev Returns the remaining number of tokens that `spender` will be
-   * allowed to spend on behalf of `owner` through {transferFrom}. This is
-   * zero by default.
-   *
-   * This value changes when {approve} or {transferFrom} are called.
-   */
-  function allowance(address owner, address spender) external view returns (uint256);
-
-  /**
-   * @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
-   *
-   * Returns a boolean value indicating whether the operation succeeded.
-   *
-   * IMPORTANT: Beware that changing an allowance with this method brings the risk
-   * that someone may use both the old and the new allowance by unfortunate
-   * transaction ordering. One possible solution to mitigate this race
-   * condition is to first reduce the spender's allowance to 0 and set the
-   * desired value afterwards:
-   * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
-   *
-   * Emits an {Approval} event.
-   */
-  function approve(address spender, uint256 amount) external returns (bool);
-
-  /**
-   * @dev Moves `amount` tokens from `sender` to `recipient` using the
-   * allowance mechanism. `amount` is then deducted from the caller's
-   * allowance.
-   *
-   * Returns a boolean value indicating whether the operation succeeded.
-   *
-   * Emits a {Transfer} event.
-   */
-  function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-
-  /**
-   * @dev Emitted when `value` tokens are moved from one account (`from`) to
-   * another (`to`).
-   *
-   * Note that `value` may be zero.
-   */
-  event Transfer(address indexed from, address indexed to, uint256 value);
-
-  /**
-   * @dev Emitted when the allowance of a `spender` for an `owner` is set by
-   * a call to {approve}. `value` is the new allowance.
-   */
-  event Approval(address indexed owner, address indexed spender, uint256 value);
-}
-
 library SafeMath {
 
     function add(uint256 a, uint256 b) internal pure returns (uint256) {
         uint256 c = a + b;
+        require(c >= a, "SafeMath: addition overflow");
+
+        return c;
+    }
+
+    function add32(uint32 a, uint32 b) internal pure returns (uint32) {
+        uint32 c = a + b;
         require(c >= a, "SafeMath: addition overflow");
 
         return c;
@@ -530,12 +33,22 @@ library SafeMath {
     }
 
     function mul(uint256 a, uint256 b) internal pure returns (uint256) {
-
         if (a == 0) {
             return 0;
         }
 
         uint256 c = a * b;
+        require(c / a == b, "SafeMath: multiplication overflow");
+
+        return c;
+    }
+
+    function mul32(uint32 a, uint32 b) internal pure returns (uint32) {
+        if (a == 0) {
+            return 0;
+        }
+
+        uint32 c = a * b;
         require(c / a == b, "SafeMath: multiplication overflow");
 
         return c;
@@ -548,358 +61,648 @@ library SafeMath {
     function div(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
         require(b > 0, errorMessage);
         uint256 c = a / b;
-        // assert(a == b * c + a % b); // There is no case in which this doesn't hold
-
         return c;
     }
+}
 
-    function mod(uint256 a, uint256 b) internal pure returns (uint256) {
-        return mod(a, b, "SafeMath: modulo by zero");
+library Address {
+
+  function isContract(address account) internal view returns (bool) {
+        // This method relies in extcodesize, which returns 0 for contracts in
+        // construction, since the code is only stored at the end of the
+        // constructor execution.
+
+        uint256 size;
+        // solhint-disable-next-line no-inline-assembly
+        assembly { size := extcodesize(account) }
+        return size > 0;
     }
 
-    function mod(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
-        require(b != 0, errorMessage);
-        return a % b;
+    function functionCall(
+        address target, 
+        bytes memory data, 
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        return _functionCallWithValue(target, data, 0, errorMessage);
     }
 
-    function sqrrt(uint256 a) internal pure returns (uint c) {
-        if (a > 3) {
-            c = a;
-            uint b = add( div( a, 2), 1 );
-            while (b < c) {
-                c = b;
-                b = div( add( div( a, b ), b), 2 );
+    function _functionCallWithValue(
+        address target, 
+        bytes memory data, 
+        uint256 weiValue, 
+        string memory errorMessage
+    ) private returns (bytes memory) {
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: weiValue }(data);
+        if (success) {
+            return returndata;
+        } else {
+            if (returndata.length > 0) {
+                // solhint-disable-next-line no-inline-assembly
+                assembly {
+                    let returndata_size := mload(returndata)
+                    revert(add(32, returndata), returndata_size)
+                }
+            } else {
+                revert(errorMessage);
             }
-        } else if (a != 0) {
-            c = 1;
         }
     }
 
-    function percentageAmount( uint256 total_, uint8 percentage_ ) internal pure returns ( uint256 percentAmount_ ) {
-        return div( mul( total_, percentage_ ), 1000 );
-    }
-
-    function substractPercentage( uint256 total_, uint8 percentageToSub_ ) internal pure returns ( uint256 result_ ) {
-        return sub( total_, div( mul( total_, percentageToSub_ ), 1000 ) );
-    }
-
-    function percentageOfTotal( uint256 part_, uint256 total_ ) internal pure returns ( uint256 percent_ ) {
-        return div( mul(part_, 100) , total_ );
-    }
-
-    function average(uint256 a, uint256 b) internal pure returns (uint256) {
-        // (a + b) / 2 can overflow, so we distribute
-        return (a / 2) + (b / 2) + ((a % 2 + b % 2) / 2);
-    }
-
-    function quadraticPricing( uint256 payment_, uint256 multiplier_ ) internal pure returns (uint256) {
-        return sqrrt( mul( multiplier_, payment_ ) );
-    }
-
-  function bondingCurve( uint256 supply_, uint256 multiplier_ ) internal pure returns (uint256) {
-      return mul( multiplier_, supply_ );
-  }
-}
-
-abstract contract ERC20 is IERC20 {
-
-  using SafeMath for uint256;
-
-  // TODO comment actual hash value.
-  bytes32 constant private ERC20TOKEN_ERC1820_INTERFACE_ID = keccak256( "ERC20Token" );
-    
-  // Present in ERC777
-  mapping (address => uint256) internal _balances;
-
-  // Present in ERC777
-  mapping (address => mapping (address => uint256)) internal _allowances;
-
-  // Present in ERC777
-  uint256 internal _totalSupply;
-
-  // Present in ERC777
-  string internal _name;
-    
-  // Present in ERC777
-  string internal _symbol;
-    
-  // Present in ERC777
-  uint8 internal _decimals;
-
-  constructor (string memory name_, string memory symbol_, uint8 decimals_) {
-    _name = name_;
-    _symbol = symbol_;
-    _decimals = decimals_;
-  }
-
-  function name() public view returns (string memory) {
-    return _name;
-  }
-
-  function symbol() public view returns (string memory) {
-    return _symbol;
-  }
-
-  function decimals() public view returns (uint8) {
-    return _decimals;
-  }
-
-  function totalSupply() public view override returns (uint256) {
-    return _totalSupply;
-  }
-
-  function balanceOf(address account) public view virtual override returns (uint256) {
-    return _balances[account];
-  }
-
-  function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
-    _transfer(msg.sender, recipient, amount);
-    return true;
-  }
-
-    function allowance(address owner, address spender) public view virtual override returns (uint256) {
-        return _allowances[owner][spender];
-    }
-
-    function approve(address spender, uint256 amount) public virtual override returns (bool) {
-        _approve(msg.sender, spender, amount);
-        return true;
-    }
-
-    function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
-        _transfer(sender, recipient, amount);
-        _approve(sender, msg.sender, _allowances[sender][msg.sender].sub(amount, "ERC20: transfer amount exceeds allowance"));
-        return true;
-    }
-
-    function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
-        _approve(msg.sender, spender, _allowances[msg.sender][spender].add(addedValue));
-        return true;
-    }
-
-    function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
-        _approve(msg.sender, spender, _allowances[msg.sender][spender].sub(subtractedValue, "ERC20: decreased allowance below zero"));
-        return true;
-    }
-
-    function _transfer(address sender, address recipient, uint256 amount) internal virtual {
-      require(sender != address(0), "ERC20: transfer from the zero address");
-      require(recipient != address(0), "ERC20: transfer to the zero address");
-
-      _beforeTokenTransfer(sender, recipient, amount);
-
-      _balances[sender] = _balances[sender].sub(amount, "ERC20: transfer amount exceeds balance");
-      _balances[recipient] = _balances[recipient].add(amount);
-      emit Transfer(sender, recipient, amount);
-    }
-
-    function _mint(address account_, uint256 amount_) internal virtual {
-        require(account_ != address(0), "ERC20: mint to the zero address");
-        _beforeTokenTransfer(address( this ), account_, amount_);
-        _totalSupply = _totalSupply.add(amount_);
-        _balances[account_] = _balances[account_].add(amount_);
-        emit Transfer(address( this ), account_, amount_);
-    }
-
-    function _burn(address account, uint256 amount) internal virtual {
-        require(account != address(0), "ERC20: burn from the zero address");
-
-        _beforeTokenTransfer(account, address(0), amount);
-
-        _balances[account] = _balances[account].sub(amount, "ERC20: burn amount exceeds balance");
-        _totalSupply = _totalSupply.sub(amount);
-        emit Transfer(account, address(0), amount);
-    }
-
-    function _approve(address owner, address spender, uint256 amount) internal virtual {
-        require(owner != address(0), "ERC20: approve from the zero address");
-        require(spender != address(0), "ERC20: approve to the zero address");
-
-        _allowances[owner][spender] = amount;
-        emit Approval(owner, spender, amount);
-    }
-
-  function _beforeTokenTransfer( address from_, address to_, uint256 amount_ ) internal virtual { }
-}
-
-library Counters {
-    using SafeMath for uint256;
-
-    struct Counter {
-        uint256 _value; // default: 0
-    }
-
-    function current(Counter storage counter) internal view returns (uint256) {
-        return counter._value;
-    }
-
-    function increment(Counter storage counter) internal {
-        counter._value += 1;
-    }
-
-    function decrement(Counter storage counter) internal {
-        counter._value = counter._value.sub(1);
-    }
-}
-
-interface IERC2612Permit {
-
-    function permit(
-        address owner,
-        address spender,
-        uint256 amount,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external;
-
-    function nonces(address owner) external view returns (uint256);
-}
-
-abstract contract ERC20Permit is ERC20, IERC2612Permit {
-    using Counters for Counters.Counter;
-
-    mapping(address => Counters.Counter) private _nonces;
-
-    // keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
-    bytes32 public constant PERMIT_TYPEHASH = 0x6e71edae12b1b97f4d1f60370fef10105fa2faae0126114a169c64845d6126c9;
-
-    bytes32 public DOMAIN_SEPARATOR;
-
-    constructor() {
-        uint256 chainID;
-        assembly {
-            chainID := chainid()
+    function _verifyCallResult(
+        bool success, 
+        bytes memory returndata, 
+        string memory errorMessage
+    ) private pure returns(bytes memory) {
+        if (success) {
+            return returndata;
+        } else {
+            if (returndata.length > 0) {
+                // solhint-disable-next-line no-inline-assembly
+                assembly {
+                    let returndata_size := mload(returndata)
+                    revert(add(32, returndata), returndata_size)
+                }
+            } else {
+                revert(errorMessage);
+            }
         }
-
-        DOMAIN_SEPARATOR = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes(name())),
-                keccak256(bytes("1")), // Version
-                chainID,
-                address(this)
-            )
-        );
-    }
-
-    function permit(
-        address owner,
-        address spender,
-        uint256 amount,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) public virtual override {
-        require(block.timestamp <= deadline, "Permit: expired deadline");
-
-        bytes32 hashStruct =
-            keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, amount, _nonces[owner].current(), deadline));
-
-        bytes32 _hash = keccak256(abi.encodePacked(uint16(0x1901), DOMAIN_SEPARATOR, hashStruct));
-
-        address signer = ecrecover(_hash, v, r, s);
-        require(signer != address(0) && signer == owner, "ZeroSwapPermit: Invalid signature");
-
-        _nonces[owner].increment();
-        _approve(owner, spender, amount);
-    }
-
-    function nonces(address owner) public view override returns (uint256) {
-        return _nonces[owner].current();
     }
 }
 
 interface IOwnable {
-  function owner() external view returns (address);
+  function manager() external view returns (address);
 
-  function renounceOwnership() external;
+  function renounceManagement() external;
   
-  function transferOwnership( address newOwner_ ) external;
+  function pushManagement( address newOwner_ ) external;
+  
+  function pullManagement() external;
 }
 
 contract Ownable is IOwnable {
+
+    address internal _owner;
+    address internal _newOwner;
+
+    event OwnershipPushed(address indexed previousOwner, address indexed newOwner);
+    event OwnershipPulled(address indexed previousOwner, address indexed newOwner);
+
+    constructor () {
+        _owner = msg.sender;
+        emit OwnershipPushed( address(0), _owner );
+    }
+
+    function manager() public view override returns (address) {
+        return _owner;
+    }
+
+    modifier onlyManager() {
+        require( _owner == msg.sender, "Ownable: caller is not the owner" );
+        _;
+    }
+
+    function renounceManagement() public virtual override onlyManager() {
+        emit OwnershipPushed( _owner, address(0) );
+        _owner = address(0);
+    }
+
+    function pushManagement( address newOwner_ ) public virtual override onlyManager() {
+        require( newOwner_ != address(0), "Ownable: new owner is the zero address");
+        emit OwnershipPushed( _owner, newOwner_ );
+        _newOwner = newOwner_;
+    }
     
-  address internal _owner;
-
-  event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-
-  constructor () {
-    _owner = msg.sender;
-    emit OwnershipTransferred( address(0), _owner );
-  }
-
-  function owner() public view override returns (address) {
-    return _owner;
-  }
-
-  modifier onlyOwner() {
-    require( _owner == msg.sender, "Ownable: caller is not the owner" );
-    _;
-  }
-
-  function renounceOwnership() public virtual override onlyOwner() {
-    emit OwnershipTransferred( _owner, address(0) );
-    _owner = address(0);
-  }
-
-  function transferOwnership( address newOwner_ ) public virtual override onlyOwner() {
-    require( newOwner_ != address(0), "Ownable: new owner is the zero address");
-    emit OwnershipTransferred( _owner, newOwner_ );
-    _owner = newOwner_;
-  }
+    function pullManagement() public virtual override {
+        require( msg.sender == _newOwner, "Ownable: must be new owner to pull");
+        emit OwnershipPulled( _owner, _newOwner );
+        _owner = _newOwner;
+    }
 }
 
-contract VaultOwned is Ownable {
-    
-  address internal _vault;
+interface IERC20 {
+    function decimals() external view returns (uint8);
 
-  function setVault( address vault_ ) external onlyOwner() returns ( bool ) {
-    _vault = vault_;
+    function balanceOf(address account) external view returns (uint256);
 
-    return true;
-  }
+    function transfer(address recipient, uint256 amount) external returns (bool);
 
-  function vault() public view returns (address) {
-    return _vault;
-  }
+    function approve(address spender, uint256 amount) external returns (bool);
 
-  modifier onlyVault() {
-    require( _vault == msg.sender, "VaultOwned: caller is not the Vault" );
-    _;
-  }
+    function totalSupply() external view returns (uint256);
 
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
-contract OlympusERC20Token is ERC20Permit, VaultOwned {
-
+library SafeERC20 {
     using SafeMath for uint256;
+    using Address for address;
 
-    constructor() ERC20("Exodia", "EXOD", 9) {
+    function safeTransfer(IERC20 token, address to, uint256 value) internal {
+        _callOptionalReturn(token, abi.encodeWithSelector(token.transfer.selector, to, value));
     }
 
-    function mint(address account_, uint256 amount_) external onlyVault() {
-        _mint(account_, amount_);
+    function safeTransferFrom(IERC20 token, address from, address to, uint256 value) internal {
+        _callOptionalReturn(token, abi.encodeWithSelector(token.transferFrom.selector, from, to, value));
     }
 
-    function burn(uint256 amount) public virtual {
-        _burn(msg.sender, amount);
-    }
-     
-    function burnFrom(address account_, uint256 amount_) public virtual {
-        _burnFrom(account_, amount_);
-    }
-
-    function _burnFrom(address account_, uint256 amount_) public virtual {
-        uint256 decreasedAllowance_ =
-            allowance(account_, msg.sender).sub(
-                amount_,
-                "ERC20: burn amount exceeds allowance"
-            );
-
-        _approve(account_, msg.sender, decreasedAllowance_);
-        _burn(account_, amount_);
+    function _callOptionalReturn(IERC20 token, bytes memory data) private {
+        bytes memory returndata = address(token).functionCall(data, "SafeERC20: low-level call failed");
+        if (returndata.length > 0) { // Return data is optional
+            // solhint-disable-next-line max-line-length
+            require(abi.decode(returndata, (bool)), "SafeERC20: ERC20 operation did not succeed");
+        }
     }
 }
+
+interface IERC20Mintable {
+  function mint( uint256 amount_ ) external;
+
+  function mint( address account_, uint256 ammount_ ) external;
+}
+
+interface IOHMERC20 {
+    function burnFrom(address account_, uint256 amount_) external;
+}
+
+interface IBondCalculator {
+  function valuation( address pair_, uint amount_ ) external view returns ( uint _value );
+}
+
+contract TimeTreasury is Ownable {
+
+    using SafeMath for uint;
+    using SafeMath for uint32;
+    using SafeERC20 for IERC20;
+
+    event Deposit( address indexed token, uint amount, uint value );
+    event Withdrawal( address indexed token, uint amount, uint value );
+    event CreateDebt( address indexed debtor, address indexed token, uint amount, uint value );
+    event RepayDebt( address indexed debtor, address indexed token, uint amount, uint value );
+    event ReservesManaged( address indexed token, uint amount );
+    event ReservesUpdated( uint indexed totalReserves );
+    event ReservesAudited( uint indexed totalReserves );
+    event RewardsMinted( address indexed caller, address indexed recipient, uint amount );
+    event ChangeQueued( MANAGING indexed managing, address queued );
+    event ChangeActivated( MANAGING indexed managing, address activated, bool result );
+
+    enum MANAGING { 
+        RESERVEDEPOSITOR, 
+        RESERVESPENDER, 
+        RESERVETOKEN, 
+        RESERVEMANAGER, 
+        LIQUIDITYDEPOSITOR, 
+        LIQUIDITYTOKEN, 
+        LIQUIDITYMANAGER, 
+        DEBTOR, 
+        REWARDMANAGER, 
+        SOHM 
+    }
+
+    address public immutable Time;
+    uint32 public immutable secondsNeededForQueue;
+
+    address[] public reserveTokens; // Push only, beware false-positives.
+    mapping( address => bool ) public isReserveToken;
+    mapping( address => uint32 ) public reserveTokenQueue; // Delays changes to mapping.
+
+    address[] public reserveDepositors; // Push only, beware false-positives. Only for viewing.
+    mapping( address => bool ) public isReserveDepositor;
+    mapping( address => uint32 ) public reserveDepositorQueue; // Delays changes to mapping.
+
+    address[] public reserveSpenders; // Push only, beware false-positives. Only for viewing.
+    mapping( address => bool ) public isReserveSpender;
+    mapping( address => uint32 ) public reserveSpenderQueue; // Delays changes to mapping.
+
+    address[] public liquidityTokens; // Push only, beware false-positives.
+    mapping( address => bool ) public isLiquidityToken;
+    mapping( address => uint32 ) public LiquidityTokenQueue; // Delays changes to mapping.
+
+    address[] public liquidityDepositors; // Push only, beware false-positives. Only for viewing.
+    mapping( address => bool ) public isLiquidityDepositor;
+    mapping( address => uint32 ) public LiquidityDepositorQueue; // Delays changes to mapping.
+
+    mapping( address => address ) public bondCalculator; // bond calculator for liquidity token
+
+    address[] public reserveManagers; // Push only, beware false-positives. Only for viewing.
+    mapping( address => bool ) public isReserveManager;
+    mapping( address => uint32 ) public ReserveManagerQueue; // Delays changes to mapping.
+
+    address[] public liquidityManagers; // Push only, beware false-positives. Only for viewing.
+    mapping( address => bool ) public isLiquidityManager;
+    mapping( address => uint32 ) public LiquidityManagerQueue; // Delays changes to mapping.
+
+    address[] public debtors; // Push only, beware false-positives. Only for viewing.
+    mapping( address => bool ) public isDebtor;
+    mapping( address => uint32 ) public debtorQueue; // Delays changes to mapping.
+    mapping( address => uint ) public debtorBalance;
+
+    address[] public rewardManagers; // Push only, beware false-positives. Only for viewing.
+    mapping( address => bool ) public isRewardManager;
+    mapping( address => uint32 ) public rewardManagerQueue; // Delays changes to mapping.
+
+    address public MEMOries;
+    uint public sOHMQueue; // Delays change to sOHM address
+    
+    uint public totalReserves; // Risk-free value of all assets
+    uint public totalDebt;
+
+    constructor (
+        address _Time,
+        address _MIM,
+        uint32 _secondsNeededForQueue
+    ) {
+        require( _Time != address(0) );
+        Time = _Time;
+
+        isReserveToken[ _MIM ] = true;
+        reserveTokens.push( _MIM );
+
+    //    isLiquidityToken[ _OHMDAI ] = true;
+    //    liquidityTokens.push( _OHMDAI );
+
+        secondsNeededForQueue = _secondsNeededForQueue;
+    }
+
+    /**
+        @notice allow approved address to deposit an asset for OHM
+        @param _amount uint
+        @param _token address
+        @param _profit uint
+        @return send_ uint
+     */
+    function deposit( uint _amount, address _token, uint _profit ) external returns ( uint send_ ) {
+        require( isReserveToken[ _token ] || isLiquidityToken[ _token ], "Not accepted" );
+        IERC20( _token ).safeTransferFrom( msg.sender, address(this), _amount );
+
+        if ( isReserveToken[ _token ] ) {
+            require( isReserveDepositor[ msg.sender ], "Not approved" );
+        } else {
+            require( isLiquidityDepositor[ msg.sender ], "Not approved" );
+        }
+
+        uint value = valueOf(_token, _amount);
+        // mint OHM needed and store amount of rewards for distribution
+        send_ = value.sub( _profit );
+        IERC20Mintable( Time ).mint( msg.sender, send_ );
+
+        totalReserves = totalReserves.add( value );
+        emit ReservesUpdated( totalReserves );
+
+        emit Deposit( _token, _amount, value );
+    }
+
+    /**
+        @notice allow approved address to burn OHM for reserves
+        @param _amount uint
+        @param _token address
+     */
+    function withdraw( uint _amount, address _token ) external {
+        require( isReserveToken[ _token ], "Not accepted" ); // Only reserves can be used for redemptions
+        require( isReserveSpender[ msg.sender ] == true, "Not approved" );
+
+        uint value = valueOf( _token, _amount );
+        IOHMERC20( Time ).burnFrom( msg.sender, value );
+
+        totalReserves = totalReserves.sub( value );
+        emit ReservesUpdated( totalReserves );
+
+        IERC20( _token ).safeTransfer( msg.sender, _amount );
+
+        emit Withdrawal( _token, _amount, value );
+    }
+
+    /**
+        @notice allow approved address to borrow reserves
+        @param _amount uint
+        @param _token address
+     */
+    function incurDebt( uint _amount, address _token ) external {
+        require( isDebtor[ msg.sender ], "Not approved" );
+        require( isReserveToken[ _token ], "Not accepted" );
+
+        uint value = valueOf( _token, _amount );
+
+        uint maximumDebt = IERC20( MEMOries ).balanceOf( msg.sender ); // Can only borrow against sOHM held
+        uint availableDebt = maximumDebt.sub( debtorBalance[ msg.sender ] );
+        require( value <= availableDebt, "Exceeds debt limit" );
+
+        debtorBalance[ msg.sender ] = debtorBalance[ msg.sender ].add( value );
+        totalDebt = totalDebt.add( value );
+
+        totalReserves = totalReserves.sub( value );
+        emit ReservesUpdated( totalReserves );
+
+        IERC20( _token ).transfer( msg.sender, _amount );
+        
+        emit CreateDebt( msg.sender, _token, _amount, value );
+    }
+
+    /**
+        @notice allow approved address to repay borrowed reserves with reserves
+        @param _amount uint
+        @param _token address
+     */
+    function repayDebtWithReserve( uint _amount, address _token ) external {
+        require( isDebtor[ msg.sender ], "Not approved" );
+        require( isReserveToken[ _token ], "Not accepted" );
+
+        IERC20( _token ).safeTransferFrom( msg.sender, address(this), _amount );
+
+        uint value = valueOf( _token, _amount );
+        debtorBalance[ msg.sender ] = debtorBalance[ msg.sender ].sub( value );
+        totalDebt = totalDebt.sub( value );
+
+        totalReserves = totalReserves.add( value );
+        emit ReservesUpdated( totalReserves );
+
+        emit RepayDebt( msg.sender, _token, _amount, value );
+    }
+
+    /**
+        @notice allow approved address to repay borrowed reserves with OHM
+        @param _amount uint
+     */
+    function repayDebtWithOHM( uint _amount ) external {
+        require( isDebtor[ msg.sender ], "Not approved" );
+
+        IOHMERC20( Time ).burnFrom( msg.sender, _amount );
+
+        debtorBalance[ msg.sender ] = debtorBalance[ msg.sender ].sub( _amount );
+        totalDebt = totalDebt.sub( _amount );
+
+        emit RepayDebt( msg.sender, Time, _amount, _amount );
+    }
+
+    /**
+        @notice allow approved address to withdraw assets
+        @param _token address
+        @param _amount uint
+     */
+    function manage( address _token, uint _amount ) external {
+        if( isLiquidityToken[ _token ] ) {
+            require( isLiquidityManager[ msg.sender ], "Not approved" );
+        } else {
+            require( isReserveManager[ msg.sender ], "Not approved" );
+        }
+
+        uint value = valueOf(_token, _amount);
+        require( value <= excessReserves(), "Insufficient reserves" );
+
+        totalReserves = totalReserves.sub( value );
+        emit ReservesUpdated( totalReserves );
+
+        IERC20( _token ).safeTransfer( msg.sender, _amount );
+
+        emit ReservesManaged( _token, _amount );
+    }
+
+    /**
+        @notice send epoch reward to staking contract
+     */
+    function mintRewards( address _recipient, uint _amount ) external {
+        require( isRewardManager[ msg.sender ], "Not approved" );
+        require( _amount <= excessReserves(), "Insufficient reserves" );
+
+        IERC20Mintable( Time ).mint( _recipient, _amount );
+
+        emit RewardsMinted( msg.sender, _recipient, _amount );
+    } 
+
+    /**
+        @notice returns excess reserves not backing tokens
+        @return uint
+     */
+    function excessReserves() public view returns ( uint ) {
+        return totalReserves.sub( IERC20( Time ).totalSupply().sub( totalDebt ) );
+    }
+
+    /**
+        @notice takes inventory of all tracked assets
+        @notice always consolidate to recognized reserves before audit
+     */
+    function auditReserves() external onlyManager() {
+        uint reserves;
+        for( uint i = 0; i < reserveTokens.length; i++ ) {
+            reserves = reserves.add ( 
+                valueOf( reserveTokens[ i ], IERC20( reserveTokens[ i ] ).balanceOf( address(this) ) )
+            );
+        }
+        for( uint i = 0; i < liquidityTokens.length; i++ ) {
+            reserves = reserves.add (
+                valueOf( liquidityTokens[ i ], IERC20( liquidityTokens[ i ] ).balanceOf( address(this) ) )
+            );
+        }
+        totalReserves = reserves;
+        emit ReservesUpdated( reserves );
+        emit ReservesAudited( reserves );
+    }
+
+    /**
+        @notice returns OHM valuation of asset
+        @param _token address
+        @param _amount uint
+        @return value_ uint
+     */
+    function valueOf( address _token, uint _amount ) public view returns ( uint value_ ) {
+        if ( isReserveToken[ _token ] ) {
+            // convert amount to match OHM decimals
+            value_ = _amount.mul( 10 ** IERC20( Time ).decimals() ).div( 10 ** IERC20( _token ).decimals() );
+        } else if ( isLiquidityToken[ _token ] ) {
+            value_ = IBondCalculator( bondCalculator[ _token ] ).valuation( _token, _amount );
+        }
+    }
+
+    /**
+        @notice queue address to change boolean in mapping
+        @param _managing MANAGING
+        @param _address address
+        @return bool
+     */
+    function queue( MANAGING _managing, address _address ) external onlyManager() returns ( bool ) {
+        require( _address != address(0) );
+        if ( _managing == MANAGING.RESERVEDEPOSITOR ) { // 0
+            reserveDepositorQueue[ _address ] = uint32(block.timestamp).add32( secondsNeededForQueue );
+        } else if ( _managing == MANAGING.RESERVESPENDER ) { // 1
+            reserveSpenderQueue[ _address ] = uint32(block.timestamp).add32( secondsNeededForQueue );
+        } else if ( _managing == MANAGING.RESERVETOKEN ) { // 2
+            reserveTokenQueue[ _address ] = uint32(block.timestamp).add32( secondsNeededForQueue );
+        } else if ( _managing == MANAGING.RESERVEMANAGER ) { // 3
+            ReserveManagerQueue[ _address ] = uint32(block.timestamp).add32( secondsNeededForQueue.mul32( 2 ) );
+        } else if ( _managing == MANAGING.LIQUIDITYDEPOSITOR ) { // 4
+            LiquidityDepositorQueue[ _address ] = uint32(block.timestamp).add32( secondsNeededForQueue );
+        } else if ( _managing == MANAGING.LIQUIDITYTOKEN ) { // 5
+            LiquidityTokenQueue[ _address ] = uint32(block.timestamp).add32( secondsNeededForQueue );
+        } else if ( _managing == MANAGING.LIQUIDITYMANAGER ) { // 6
+            LiquidityManagerQueue[ _address ] = uint32(block.timestamp).add32( secondsNeededForQueue.mul32( 2 ) );
+        } else if ( _managing == MANAGING.DEBTOR ) { // 7
+            debtorQueue[ _address ] = uint32(block.timestamp).add32( secondsNeededForQueue );
+        } else if ( _managing == MANAGING.REWARDMANAGER ) { // 8
+            rewardManagerQueue[ _address ] = uint32(block.timestamp).add32( secondsNeededForQueue );
+        } else if ( _managing == MANAGING.SOHM ) { // 9
+            sOHMQueue = uint32(block.timestamp).add32( secondsNeededForQueue );
+        } else return false;
+
+        emit ChangeQueued( _managing, _address );
+        return true;
+    }
+
+    /**
+        @notice verify queue then set boolean in mapping
+        @param _managing MANAGING
+        @param _address address
+        @param _calculator address
+        @return bool
+     */
+    function toggle(
+        MANAGING _managing, 
+        address _address, 
+        address _calculator 
+    ) external onlyManager() returns ( bool ) {
+        require( _address != address(0) );
+        bool result;
+        if ( _managing == MANAGING.RESERVEDEPOSITOR ) { // 0
+            if ( requirements( reserveDepositorQueue, isReserveDepositor, _address ) ) {
+                reserveDepositorQueue[ _address ] = 0;
+                if( !listContains( reserveDepositors, _address ) ) {
+                    reserveDepositors.push( _address );
+                }
+            }
+            result = !isReserveDepositor[ _address ];
+            isReserveDepositor[ _address ] = result;
+            
+        } else if ( _managing == MANAGING.RESERVESPENDER ) { // 1
+            if ( requirements( reserveSpenderQueue, isReserveSpender, _address ) ) {
+                reserveSpenderQueue[ _address ] = 0;
+                if( !listContains( reserveSpenders, _address ) ) {
+                    reserveSpenders.push( _address );
+                }
+            }
+            result = !isReserveSpender[ _address ];
+            isReserveSpender[ _address ] = result;
+
+        } else if ( _managing == MANAGING.RESERVETOKEN ) { // 2
+            if ( requirements( reserveTokenQueue, isReserveToken, _address ) ) {
+                reserveTokenQueue[ _address ] = 0;
+                if( !listContains( reserveTokens, _address ) ) {
+                    reserveTokens.push( _address );
+                }
+            }
+            result = !isReserveToken[ _address ];
+            isReserveToken[ _address ] = result;
+
+        } else if ( _managing == MANAGING.RESERVEMANAGER ) { // 3
+            if ( requirements( ReserveManagerQueue, isReserveManager, _address ) ) {
+                reserveManagers.push( _address );
+                ReserveManagerQueue[ _address ] = 0;
+                if( !listContains( reserveManagers, _address ) ) {
+                    reserveManagers.push( _address );
+                }
+            }
+            result = !isReserveManager[ _address ];
+            isReserveManager[ _address ] = result;
+
+        } else if ( _managing == MANAGING.LIQUIDITYDEPOSITOR ) { // 4
+            if ( requirements( LiquidityDepositorQueue, isLiquidityDepositor, _address ) ) {
+                liquidityDepositors.push( _address );
+                LiquidityDepositorQueue[ _address ] = 0;
+                if( !listContains( liquidityDepositors, _address ) ) {
+                    liquidityDepositors.push( _address );
+                }
+            }
+            result = !isLiquidityDepositor[ _address ];
+            isLiquidityDepositor[ _address ] = result;
+
+        } else if ( _managing == MANAGING.LIQUIDITYTOKEN ) { // 5
+            if ( requirements( LiquidityTokenQueue, isLiquidityToken, _address ) ) {
+                LiquidityTokenQueue[ _address ] = 0;
+                if( !listContains( liquidityTokens, _address ) ) {
+                    liquidityTokens.push( _address );
+                }
+            }
+            result = !isLiquidityToken[ _address ];
+            isLiquidityToken[ _address ] = result;
+            bondCalculator[ _address ] = _calculator;
+
+        } else if ( _managing == MANAGING.LIQUIDITYMANAGER ) { // 6
+            if ( requirements( LiquidityManagerQueue, isLiquidityManager, _address ) ) {
+                LiquidityManagerQueue[ _address ] = 0;
+                if( !listContains( liquidityManagers, _address ) ) {
+                    liquidityManagers.push( _address );
+                }
+            }
+            result = !isLiquidityManager[ _address ];
+            isLiquidityManager[ _address ] = result;
+
+        } else if ( _managing == MANAGING.DEBTOR ) { // 7
+            if ( requirements( debtorQueue, isDebtor, _address ) ) {
+                debtorQueue[ _address ] = 0;
+                if( !listContains( debtors, _address ) ) {
+                    debtors.push( _address );
+                }
+            }
+            result = !isDebtor[ _address ];
+            isDebtor[ _address ] = result;
+
+        } else if ( _managing == MANAGING.REWARDMANAGER ) { // 8
+            if ( requirements( rewardManagerQueue, isRewardManager, _address ) ) {
+                rewardManagerQueue[ _address ] = 0;
+                if( !listContains( rewardManagers, _address ) ) {
+                    rewardManagers.push( _address );
+                }
+            }
+            result = !isRewardManager[ _address ];
+            isRewardManager[ _address ] = result;
+
+        } else if ( _managing == MANAGING.SOHM ) { // 9
+            sOHMQueue = 0;
+            MEMOries = _address;
+            result = true;
+
+        } else return false;
+
+        emit ChangeActivated( _managing, _address, result );
+        return true;
+    }
+
+    /**
+        @notice checks requirements and returns altered structs
+        @param queue_ mapping( address => uint )
+        @param status_ mapping( address => bool )
+        @param _address address
+        @return bool 
+     */
+    function requirements( 
+        mapping( address => uint32 ) storage queue_, 
+        mapping( address => bool ) storage status_, 
+        address _address 
+    ) internal view returns ( bool ) {
+        if ( !status_[ _address ] ) {
+            require( queue_[ _address ] != 0, "Must queue" );
+            require( queue_[ _address ] <= uint32(block.timestamp), "Queue not expired" );
+            return true;
+        } return false;
+    }
+
+    /**
+        @notice checks array to ensure against duplicate
+        @param _list address[]
+        @param _token address
+        @return bool
+     */
+    function listContains( address[] storage _list, address _token ) internal view returns ( bool ) {
+        for( uint i = 0; i < _list.length; i++ ) {
+            if( _list[ i ] == _token ) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
