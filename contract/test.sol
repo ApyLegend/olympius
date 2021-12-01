@@ -1,5 +1,5 @@
 /**
- *Submitted for verification at snowtrace.io on 2021-11-13
+ *Submitted for verification at snowtrace.io on 2021-11-16
 */
 
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -923,7 +923,7 @@ contract TimeBondDepository is Ownable {
     function redeem( address _recipient, bool _stake ) external returns ( uint ) {        
         Bond memory info = bondInfo[ _recipient ];
         // (seconds since last interaction / vesting term remaining)
-        uint percentVested = percentVestedFor( _recipient ); 
+        uint percentVested = percentVestedFor( _recipient );
 
         if ( percentVested >= 10000 ) { // if fully vested
             delete bondInfo[ _recipient ]; // delete user info
