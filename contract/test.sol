@@ -1,5 +1,5 @@
 /**
- *Submitted for verification at snowtrace.io on 2021-11-06
+ *Submitted for verification at snowtrace.io on 2021-11-13
 */
 
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -628,41 +628,14 @@ library FixedPoint {
     }
 }
 
-interface AggregatorV3Interface {
-
-  function decimals() external view returns (uint8);
-  function description() external view returns (string memory);
-  function version() external view returns (uint256);
-
-  // getRoundData and latestRoundData should both raise "No data present"
-  // if they do not have data to report, instead of returning unset values
-  // which could be misinterpreted as actual reported values.
-  function getRoundData(uint80 _roundId)
-    external
-    view
-    returns (
-      uint80 roundId,
-      int256 answer,
-      uint256 startedAt,
-      uint256 updatedAt,
-      uint80 answeredInRound
-    );
-  function latestRoundData()
-    external
-    view
-    returns (
-      uint80 roundId,
-      int256 answer,
-      uint256 startedAt,
-      uint256 updatedAt,
-      uint80 answeredInRound
-    );
-}
-
 interface ITreasury {
     function deposit( uint _amount, address _token, uint _profit ) external returns ( bool );
     function valueOf( address _token, uint _amount ) external view returns ( uint value_ );
-    function mintRewards( address _recipient, uint _amount ) external;
+}
+
+interface IBondCalculator {
+    function valuation( address _LP, uint _amount ) external view returns ( uint );
+    function markdown( address _LP ) external view returns ( uint );
 }
 
 interface IStaking {
@@ -671,11 +644,6 @@ interface IStaking {
 
 interface IStakingHelper {
     function stake( uint _amount, address _recipient ) external;
-}
-
-interface IWETH9 is IERC20 {
-    /// @notice Deposit ether to get wrapped ether
-    function deposit() external payable;
 }
 
 contract TimeBondDepository is Ownable {
@@ -699,12 +667,14 @@ contract TimeBondDepository is Ownable {
 
 
     /* ======== STATE VARIABLES ======== */
-    address public immutable OHM; // token given as payment for bond
+
+    address public immutable Time; // token given as payment for bond
     address public immutable principle; // token used to create bond
     address public immutable treasury; // mints OHM when receives principle
     address public immutable DAO; // receives profit share from bond
 
-    AggregatorV3Interface internal priceFeed;
+    bool public immutable isLiquidityBond; // LP and Reserve bonds are treated slightly different
+    address public immutable bondCalculator; // calculates value of LP tokens
 
     address public staking; // to auto-stake payout
     address public stakingHelper; // to stake and claim if no staking warmup
@@ -716,7 +686,7 @@ contract TimeBondDepository is Ownable {
     mapping( address => Bond ) public bondInfo; // stores bond information for depositors
 
     uint public totalDebt; // total value of outstanding bonds; used for pricing
-    uint32 public lastDecay; // reference block for debt decay
+    uint32 public lastDecay; // reference time for debt decay
 
 
 
@@ -726,8 +696,9 @@ contract TimeBondDepository is Ownable {
     // Info for creating new bonds
     struct Terms {
         uint controlVariable; // scaling variable for price
-        uint minimumPrice; // vs principle value. 4 decimals (1500 = 0.15)
+        uint minimumPrice; // vs principle value
         uint maxPayout; // in thousandths of a %. i.e. 500 = 0.5%
+        uint fee; // as % of bond payout, in hundreths. ( 500 = 5% = 0.05 for every 1 paid)
         uint maxDebt; // 9 decimal debt ratio, max % total supply created as debt
         uint32 vestingTerm; // in seconds
     }
@@ -736,8 +707,8 @@ contract TimeBondDepository is Ownable {
     struct Bond {
         uint payout; // OHM remaining to be paid
         uint pricePaid; // In DAI, for front end viewing
-        uint32 vesting; // Seconds left to vest
         uint32 lastTime; // Last interaction
+        uint32 vesting; // Seconds left to vest
     }
 
     // Info for incremental adjustments to control variable 
@@ -746,7 +717,7 @@ contract TimeBondDepository is Ownable {
         uint rate; // increment
         uint target; // BCV when adjustment finished
         uint32 buffer; // minimum length (in seconds) between adjustments
-        uint32 lastTime; // block when last adjustment made
+        uint32 lastTime; // time when last adjustment made
     }
 
 
@@ -755,30 +726,32 @@ contract TimeBondDepository is Ownable {
     /* ======== INITIALIZATION ======== */
 
     constructor ( 
-        address _OHM,
+        address _Time,
         address _principle,
         address _treasury, 
-        address _DAO,
-        address _feed
+        address _DAO, 
+        address _bondCalculator
     ) {
-        require( _OHM != address(0) );
-        OHM = _OHM;
+        require( _Time != address(0) );
+        Time = _Time;
         require( _principle != address(0) );
         principle = _principle;
         require( _treasury != address(0) );
         treasury = _treasury;
         require( _DAO != address(0) );
         DAO = _DAO;
-        require( _feed != address(0) );
-        priceFeed = AggregatorV3Interface( _feed );
+        // bondCalculator should be address(0) if not LP bond
+        bondCalculator = _bondCalculator;
+        isLiquidityBond = ( _bondCalculator != address(0) );
     }
 
     /**
      *  @notice initializes bond parameters
      *  @param _controlVariable uint
-     *  @param _vestingTerm uint
+     *  @param _vestingTerm uint32
      *  @param _minimumPrice uint
      *  @param _maxPayout uint
+     *  @param _fee uint
      *  @param _maxDebt uint
      *  @param _initialDebt uint
      */
@@ -786,17 +759,19 @@ contract TimeBondDepository is Ownable {
         uint _controlVariable, 
         uint _minimumPrice,
         uint _maxPayout,
+        uint _fee,
         uint _maxDebt,
         uint _initialDebt,
         uint32 _vestingTerm
     ) external onlyPolicy() {
-        require( currentDebt() == 0, "Debt must be 0 for initialization" );
+        require( terms.controlVariable == 0, "Bonds must be initialized from 0" );
         terms = Terms ({
             controlVariable: _controlVariable,
-            vestingTerm: _vestingTerm,
             minimumPrice: _minimumPrice,
             maxPayout: _maxPayout,
-            maxDebt: _maxDebt
+            fee: _fee,
+            maxDebt: _maxDebt,
+            vestingTerm: _vestingTerm
         });
         totalDebt = _initialDebt;
         lastDecay = uint32(block.timestamp);
@@ -807,7 +782,7 @@ contract TimeBondDepository is Ownable {
     
     /* ======== POLICY FUNCTIONS ======== */
 
-    enum PARAMETER { VESTING, PAYOUT, DEBT, MINPRICE }
+    enum PARAMETER { VESTING, PAYOUT, FEE, DEBT, MINPRICE }
     /**
      *  @notice set parameters for new bonds
      *  @param _parameter PARAMETER
@@ -820,9 +795,12 @@ contract TimeBondDepository is Ownable {
         } else if ( _parameter == PARAMETER.PAYOUT ) { // 1
             require( _input <= 1000, "Payout cannot be above 1 percent" );
             terms.maxPayout = _input;
-        } else if ( _parameter == PARAMETER.DEBT ) { // 2
+        } else if ( _parameter == PARAMETER.FEE ) { // 2
+            require( _input <= 10000, "DAO fee cannot exceed payout" );
+            terms.fee = _input;
+        } else if ( _parameter == PARAMETER.DEBT ) { // 3
             terms.maxDebt = _input;
-        } else if ( _parameter == PARAMETER.MINPRICE ) { // 3
+        } else if ( _parameter == PARAMETER.MINPRICE ) { // 4
             terms.minimumPrice = _input;
         }
     }
@@ -883,7 +861,7 @@ contract TimeBondDepository is Ownable {
         uint _amount, 
         uint _maxPrice,
         address _depositor
-    ) external payable returns ( uint ) {
+    ) external returns ( uint ) {
         require( _depositor != address(0), "Invalid address" );
 
         decayDebt();
@@ -900,19 +878,22 @@ contract TimeBondDepository is Ownable {
         require( payout >= 10000000, "Bond too small" ); // must be > 0.01 OHM ( underflow protection )
         require( payout <= maxPayout(), "Bond too large"); // size protection because there is no slippage
 
+        // profits are calculated
+        uint fee = payout.mul( terms.fee ).div( 10000 );
+        uint profit = value.sub( payout ).sub( fee );
+
         /**
-            asset carries risk and is not minted against
-            asset transfered to treasury and rewards minted as payout
+            principle is transferred in
+            approved and
+            deposited into the treasury, returning (_amount - profit) OHM
          */
-        if (address(this).balance >= _amount) {
-            // pay with WETH9
-            IWETH9(principle).deposit{value: _amount}(); // wrap only what is needed to pay
-            IWETH9(principle).transfer(treasury, _amount);
-        } else {
-            IERC20( principle ).safeTransferFrom( msg.sender, treasury, _amount );
-        }
+        IERC20( principle ).safeTransferFrom( msg.sender, address(this), _amount );
+        IERC20( principle ).approve( address( treasury ), _amount );
+        ITreasury( treasury ).deposit( _amount, principle, profit );
         
-        ITreasury( treasury ).mintRewards( address(this), payout );
+        if ( fee != 0 ) { // fee is transferred to dao 
+            IERC20( Time ).safeTransfer( DAO, fee ); 
+        }
         
         // total debt is increased
         totalDebt = totalDebt.add( value ); 
@@ -930,7 +911,6 @@ contract TimeBondDepository is Ownable {
         emit BondPriceChanged( bondPriceInUSD(), _bondPrice(), debtRatio() );
 
         adjust(); // control variable is adjusted
-        refundETH(); //refund user if needed
         return payout; 
     }
 
@@ -942,7 +922,8 @@ contract TimeBondDepository is Ownable {
      */ 
     function redeem( address _recipient, bool _stake ) external returns ( uint ) {        
         Bond memory info = bondInfo[ _recipient ];
-        uint percentVested = percentVestedFor( _recipient ); // (blocks since last interaction / vesting term remaining)
+        // (seconds since last interaction / vesting term remaining)
+        uint percentVested = percentVestedFor( _recipient ); 
 
         if ( percentVested >= 10000 ) { // if fully vested
             delete bondInfo[ _recipient ]; // delete user info
@@ -952,12 +933,11 @@ contract TimeBondDepository is Ownable {
         } else { // if unfinished
             // calculate payout vested
             uint payout = info.payout.mul( percentVested ).div( 10000 );
-
             // store updated deposit info
             bondInfo[ _recipient ] = Bond({
                 payout: info.payout.sub( payout ),
                 vesting: info.vesting.sub32( uint32( block.timestamp ).sub32( info.lastTime ) ),
-                lastTime: uint32( block.timestamp ),
+                lastTime: uint32(block.timestamp),
                 pricePaid: info.pricePaid
             });
 
@@ -979,13 +959,13 @@ contract TimeBondDepository is Ownable {
      */
     function stakeOrSend( address _recipient, bool _stake, uint _amount ) internal returns ( uint ) {
         if ( !_stake ) { // if user does not want to stake
-            IERC20( OHM ).transfer( _recipient, _amount ); // send payout
+            IERC20( Time ).transfer( _recipient, _amount ); // send payout
         } else { // if user wants to stake
             if ( useHelper ) { // use if staking warmup is 0
-                IERC20( OHM ).approve( stakingHelper, _amount );
+                IERC20( Time ).approve( stakingHelper, _amount );
                 IStakingHelper( stakingHelper ).stake( _amount, _recipient );
             } else {
-                IERC20( OHM ).approve( staking, _amount );
+                IERC20( Time ).approve( staking, _amount );
                 IStaking( staking ).stake( _amount, _recipient );
             }
         }
@@ -996,8 +976,8 @@ contract TimeBondDepository is Ownable {
      *  @notice makes incremental adjustment to control variable
      */
     function adjust() internal {
-         uint timeCanAdjust = adjustment.lastTime.add( adjustment.buffer );
-         if( adjustment.rate != 0 && block.timestamp >= timeCanAdjust ) {
+        uint timeCanAdjust = adjustment.lastTime.add( adjustment.buffer );
+        if( adjustment.rate != 0 && block.timestamp >= timeCanAdjust ) {
             uint initial = terms.controlVariable;
             if ( adjustment.add ) {
                 terms.controlVariable = terms.controlVariable.add( adjustment.rate );
@@ -1033,7 +1013,7 @@ contract TimeBondDepository is Ownable {
      *  @return uint
      */
     function maxPayout() public view returns ( uint ) {
-        return IERC20( OHM ).totalSupply().mul( terms.maxPayout ).div( 100000 );
+        return IERC20( Time ).totalSupply().mul( terms.maxPayout ).div( 100000 );
     }
 
     /**
@@ -1042,7 +1022,7 @@ contract TimeBondDepository is Ownable {
      *  @return uint
      */
     function payoutFor( uint _value ) public view returns ( uint ) {
-        return FixedPoint.fraction( _value, bondPrice() ).decode112with18().div( 1e14 );
+        return FixedPoint.fraction( _value, bondPrice() ).decode112with18().div( 1e16 );
     }
 
 
@@ -1051,7 +1031,7 @@ contract TimeBondDepository is Ownable {
      *  @return price_ uint
      */
     function bondPrice() public view returns ( uint price_ ) {        
-        price_ = terms.controlVariable.mul( debtRatio() ).div( 1e5 );
+        price_ = terms.controlVariable.mul( debtRatio() ).add( 1000000000 ).div( 1e7 );
         if ( price_ < terms.minimumPrice ) {
             price_ = terms.minimumPrice;
         }
@@ -1062,7 +1042,7 @@ contract TimeBondDepository is Ownable {
      *  @return price_ uint
      */
     function _bondPrice() internal returns ( uint price_ ) {
-        price_ = terms.controlVariable.mul( debtRatio() ).div( 1e5 );
+        price_ = terms.controlVariable.mul( debtRatio() ).add( 1000000000 ).div( 1e7 );
         if ( price_ < terms.minimumPrice ) {
             price_ = terms.minimumPrice;        
         } else if ( terms.minimumPrice != 0 ) {
@@ -1071,19 +1051,15 @@ contract TimeBondDepository is Ownable {
     }
 
     /**
-     *  @notice get asset price from chainlink
-     */
-    function assetPrice() public view returns (int) {
-        ( , int price, , , ) = priceFeed.latestRoundData();
-        return price;
-    }
-
-    /**
      *  @notice converts bond price to DAI value
      *  @return price_ uint
      */
     function bondPriceInUSD() public view returns ( uint price_ ) {
-        price_ = bondPrice().mul( uint( assetPrice() ) ).mul( 1e6 );
+        if( isLiquidityBond ) {
+            price_ = bondPrice().mul( IBondCalculator( bondCalculator ).markdown( principle ) ).div( 100 );
+        } else {
+            price_ = bondPrice().mul( 10 ** IERC20( principle ).decimals() ).div( 100 );
+        }
     }
 
 
@@ -1092,7 +1068,7 @@ contract TimeBondDepository is Ownable {
      *  @return debtRatio_ uint
      */
     function debtRatio() public view returns ( uint debtRatio_ ) {   
-        uint supply = IERC20( OHM ).totalSupply();
+        uint supply = IERC20( Time ).totalSupply();
         debtRatio_ = FixedPoint.fraction( 
             currentDebt().mul( 1e9 ), 
             supply
@@ -1100,11 +1076,15 @@ contract TimeBondDepository is Ownable {
     }
 
     /**
-     *  @notice debt ratio in same terms as reserve bonds
+     *  @notice debt ratio in same terms for reserve or liquidity bonds
      *  @return uint
      */
     function standardizedDebtRatio() external view returns ( uint ) {
-        return debtRatio().mul( uint( assetPrice() ) ).div( 1e8 ); // ETH feed is 8 decimals
+        if ( isLiquidityBond ) {
+            return debtRatio().mul( IBondCalculator( bondCalculator ).markdown( principle ) ).div( 1e9 );
+        } else {
+            return debtRatio();
+        }
     }
 
     /**
@@ -1171,22 +1151,9 @@ contract TimeBondDepository is Ownable {
      *  @return bool
      */
     function recoverLostToken( address _token ) external returns ( bool ) {
-        require( _token != OHM );
+        require( _token != Time );
         require( _token != principle );
         IERC20( _token ).safeTransfer( DAO, IERC20( _token ).balanceOf( address(this) ) );
         return true;
-    }
-
-    function refundETH() internal {
-        if (address(this).balance > 0) safeTransferETH(DAO, address(this).balance);
-    }
-
-    /// @notice Transfers ETH to the recipient address
-    /// @dev Fails with `STE`
-    /// @param to The destination of the transfer
-    /// @param value The value to be transferred
-    function safeTransferETH(address to, uint256 value) internal {
-        (bool success, ) = to.call{value: value}(new bytes(0));
-        require(success, 'STE');
     }
 }
