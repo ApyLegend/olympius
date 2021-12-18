@@ -1,5 +1,5 @@
 /**
- *Submitted for verification at snowtrace.io on 2021-11-06
+ *Submitted for verification at snowtrace.io on 2021-12-17
 */
 
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -227,7 +227,7 @@ interface IERC20Mintable {
   function mint( address account_, uint256 ammount_ ) external;
 }
 
-interface IOHMERC20 {
+interface IWdaoERC20 {
     function burnFrom(address account_, uint256 amount_) external;
 }
 
@@ -235,7 +235,7 @@ interface IBondCalculator {
   function valuation( address pair_, uint amount_ ) external view returns ( uint _value );
 }
 
-contract TimeTreasury is Ownable {
+contract WdaoTreasury is Ownable {
 
     using SafeMath for uint;
     using SafeMath for uint32;
@@ -262,10 +262,10 @@ contract TimeTreasury is Ownable {
         LIQUIDITYMANAGER, 
         DEBTOR, 
         REWARDMANAGER, 
-        SOHM 
+        MEGA 
     }
 
-    address public immutable Time;
+    address public immutable Wdao;
     uint32 public immutable secondsNeededForQueue;
 
     address[] public reserveTokens; // Push only, beware false-positives.
@@ -307,31 +307,31 @@ contract TimeTreasury is Ownable {
     mapping( address => bool ) public isRewardManager;
     mapping( address => uint32 ) public rewardManagerQueue; // Delays changes to mapping.
 
-    address public MEMOries;
-    uint public sOHMQueue; // Delays change to sOHM address
+    address public Alpha;
+    uint public AlphaQueue; // Delays change to Alpha address
     
     uint public totalReserves; // Risk-free value of all assets
     uint public totalDebt;
 
     constructor (
-        address _Time,
+        address _Wdao,
         address _MIM,
         uint32 _secondsNeededForQueue
     ) {
-        require( _Time != address(0) );
-        Time = _Time;
+        require( _Wdao != address(0) );
+        Wdao = _Wdao;
 
         isReserveToken[ _MIM ] = true;
         reserveTokens.push( _MIM );
 
-    //    isLiquidityToken[ _OHMDAI ] = true;
-    //    liquidityTokens.push( _OHMDAI );
+        // isLiquidityToken[ _SPRMIM ] = true;
+        // liquidityTokens.push( _SPRMIM );
 
         secondsNeededForQueue = _secondsNeededForQueue;
     }
 
     /**
-        @notice allow approved address to deposit an asset for OHM
+        @notice allow approved address to deposit an asset for Wdao
         @param _amount uint
         @param _token address
         @param _profit uint
@@ -348,9 +348,9 @@ contract TimeTreasury is Ownable {
         }
 
         uint value = valueOf(_token, _amount);
-        // mint OHM needed and store amount of rewards for distribution
+        // mint Wdao needed and store amount of rewards for distribution
         send_ = value.sub( _profit );
-        IERC20Mintable( Time ).mint( msg.sender, send_ );
+        IERC20Mintable( Wdao ).mint( msg.sender, send_ );
 
         totalReserves = totalReserves.add( value );
         emit ReservesUpdated( totalReserves );
@@ -359,7 +359,7 @@ contract TimeTreasury is Ownable {
     }
 
     /**
-        @notice allow approved address to burn OHM for reserves
+        @notice allow approved address to burn Wdao for reserves
         @param _amount uint
         @param _token address
      */
@@ -368,7 +368,7 @@ contract TimeTreasury is Ownable {
         require( isReserveSpender[ msg.sender ] == true, "Not approved" );
 
         uint value = valueOf( _token, _amount );
-        IOHMERC20( Time ).burnFrom( msg.sender, value );
+        IWdaoERC20( Wdao ).burnFrom( msg.sender, value );
 
         totalReserves = totalReserves.sub( value );
         emit ReservesUpdated( totalReserves );
@@ -389,7 +389,7 @@ contract TimeTreasury is Ownable {
 
         uint value = valueOf( _token, _amount );
 
-        uint maximumDebt = IERC20( MEMOries ).balanceOf( msg.sender ); // Can only borrow against sOHM held
+        uint maximumDebt = IERC20( Alpha ).balanceOf( msg.sender ); // Can only borrow against Alpha held
         uint availableDebt = maximumDebt.sub( debtorBalance[ msg.sender ] );
         require( value <= availableDebt, "Exceeds debt limit" );
 
@@ -426,18 +426,18 @@ contract TimeTreasury is Ownable {
     }
 
     /**
-        @notice allow approved address to repay borrowed reserves with OHM
+        @notice allow approved address to repay borrowed reserves with Wdao
         @param _amount uint
      */
-    function repayDebtWithOHM( uint _amount ) external {
+    function repayDebtWithWdao( uint _amount ) external {
         require( isDebtor[ msg.sender ], "Not approved" );
 
-        IOHMERC20( Time ).burnFrom( msg.sender, _amount );
+        IWdaoERC20( Wdao ).burnFrom( msg.sender, _amount );
 
         debtorBalance[ msg.sender ] = debtorBalance[ msg.sender ].sub( _amount );
         totalDebt = totalDebt.sub( _amount );
 
-        emit RepayDebt( msg.sender, Time, _amount, _amount );
+        emit RepayDebt( msg.sender, Wdao, _amount, _amount );
     }
 
     /**
@@ -470,7 +470,7 @@ contract TimeTreasury is Ownable {
         require( isRewardManager[ msg.sender ], "Not approved" );
         require( _amount <= excessReserves(), "Insufficient reserves" );
 
-        IERC20Mintable( Time ).mint( _recipient, _amount );
+        IERC20Mintable( Wdao ).mint( _recipient, _amount );
 
         emit RewardsMinted( msg.sender, _recipient, _amount );
     } 
@@ -480,7 +480,7 @@ contract TimeTreasury is Ownable {
         @return uint
      */
     function excessReserves() public view returns ( uint ) {
-        return totalReserves.sub( IERC20( Time ).totalSupply().sub( totalDebt ) );
+        return totalReserves.sub( IERC20( Wdao ).totalSupply().sub( totalDebt ) );
     }
 
     /**
@@ -505,15 +505,15 @@ contract TimeTreasury is Ownable {
     }
 
     /**
-        @notice returns OHM valuation of asset
+        @notice returns Wdao valuation of asset
         @param _token address
         @param _amount uint
         @return value_ uint
      */
     function valueOf( address _token, uint _amount ) public view returns ( uint value_ ) {
         if ( isReserveToken[ _token ] ) {
-            // convert amount to match OHM decimals
-            value_ = _amount.mul( 10 ** IERC20( Time ).decimals() ).div( 10 ** IERC20( _token ).decimals() );
+            // convert amount to match Wdao decimals
+            value_ = _amount.mul( 10 ** IERC20( Wdao ).decimals() ).div( 10 ** IERC20( _token ).decimals() );
         } else if ( isLiquidityToken[ _token ] ) {
             value_ = IBondCalculator( bondCalculator[ _token ] ).valuation( _token, _amount );
         }
@@ -545,8 +545,8 @@ contract TimeTreasury is Ownable {
             debtorQueue[ _address ] = uint32(block.timestamp).add32( secondsNeededForQueue );
         } else if ( _managing == MANAGING.REWARDMANAGER ) { // 8
             rewardManagerQueue[ _address ] = uint32(block.timestamp).add32( secondsNeededForQueue );
-        } else if ( _managing == MANAGING.SOHM ) { // 9
-            sOHMQueue = uint32(block.timestamp).add32( secondsNeededForQueue );
+        } else if ( _managing == MANAGING.MEGA ) { // 9
+            AlphaQueue = uint32(block.timestamp).add32( secondsNeededForQueue );
         } else return false;
 
         emit ChangeQueued( _managing, _address );
@@ -660,9 +660,9 @@ contract TimeTreasury is Ownable {
             result = !isRewardManager[ _address ];
             isRewardManager[ _address ] = result;
 
-        } else if ( _managing == MANAGING.SOHM ) { // 9
-            sOHMQueue = 0;
-            MEMOries = _address;
+        } else if ( _managing == MANAGING.MEGA ) { // 9
+            AlphaQueue = 0;
+            Alpha = _address;
             result = true;
 
         } else return false;
